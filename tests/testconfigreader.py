@@ -4,7 +4,7 @@ import os
 import unittest
 from configparser import ConfigParser
 from io import StringIO
-from configreader import ConfigReader
+from pyconfigreader.reader import ConfigReader
 from uuid import uuid4
 from testfixtures import TempDirectory
 
