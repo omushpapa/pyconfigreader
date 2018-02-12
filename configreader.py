@@ -108,7 +108,6 @@ class ConfigReader(object):
         value = None
         try:
             value = self.__parser.get(section, option=key)
-            #print('Key:', key, ' value:', value)
         except (NoSectionError, NoOptionError):
             if default is not None:
                 value = default
