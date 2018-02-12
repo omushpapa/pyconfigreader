@@ -37,7 +37,6 @@ class ConfigReader(object):
     def __init__(self, filename='settings.ini'):
         self.__parser = ConfigParser()
         self.__filename = self._set_filename(filename)
-        self.__parser.read(filename)
         self._create_config()
 
     @property
@@ -216,14 +215,24 @@ class ConfigReader(object):
 
         return result
 
-    def to_json(self, filename=None):
+    def to_json(self, file_handle=None):
         """Export config to JSON
 
-        If filename is given, it is exported to the file
-        else returned as called"""
+        If a filehandle is given, it is exported to the handle
+        else returned as called
+
+        Usage:
+            with open('abc.ini', 'w') as f:
+                instance.to_json(f)
+
+                or
+
+            from io import StringIO
+            s_io = StringIO()
+            instance.to_json(s_io)
+        """
         config = self.print(output=False)
-        if filename is None:
+        if file_handle is None:
             return json.dumps(config)
         else:
-            with open(filename, 'w') as f:
-                json.dump(config, f)
+            json.dump(config, file_handle)
