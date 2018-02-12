@@ -8,8 +8,12 @@ A simple settings.ini handler in python
 
 ## Usage
 
+```
+$ pip install pyconfigparser
+```
+
 ```python
-from configreader import ConfigReader
+from pyconfigreader.reader import ConfigReader
 
 config = ConfigReader(filename='config.ini')
 config.set('Key', 'Value', section='Section')
