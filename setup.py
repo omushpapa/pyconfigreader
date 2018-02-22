@@ -1,13 +1,14 @@
 from setuptools import setup
 
 setup(name='pyconfigreader',
-      version='0.0.1',
-      description='A simple settings.ini handler in python',
-      url='http://github.com/giantas/configreader',
+      version='0.0.3',
+      description='A simple module for handling configurations and config files',
+      url='http://github.com/giantas/pyconfigreader',
       author='Aswa Paul',
       license='MIT',
       packages=['pyconfigreader'],
       install_requires=[
           'testfixtures',
       ],
+      python_requires='>=3',
       zip_safe=False)

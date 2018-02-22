@@ -4,7 +4,7 @@ import os
 import unittest
 from configparser import ConfigParser
 from io import StringIO
-from pyconfigreader.reader import ConfigReader
+from pyconfigreader import ConfigReader
 from uuid import uuid4
 from testfixtures import TempDirectory
 
@@ -14,7 +14,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tempdir = TempDirectory()
-        cls.file_path = cls.tempdir.write(str(uuid4()), b'')
+        cls.file_path = os.path.join(cls.tempdir.path, str(uuid4()))
         cls.filename = os.path.basename(cls.file_path)
         cls.test_dir = cls.tempdir.makedir('test_path')
         cls.config_file = 'settings.ini'
@@ -25,6 +25,15 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
     def setUp(self):
         self.config = ConfigReader(self.file_path)
+
+    def test_returns_false_if_filename_not_absolute(self):
+        with self.subTest(0):
+            config = ConfigReader(self.file_path)
+            self.assertTrue(os.path.isabs(config.filename))
+
+        with self.subTest(1):
+            config = ConfigReader()
+            self.assertTrue(os.path.isabs(config.filename))
 
     def test_returns_false_if_default_name_not_match(self):
         expected = self.file_path
@@ -39,7 +48,13 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
     def test_returns_false_if_config_file_not_exists(self):
         self.config = ConfigReader(self.file_path)
+        self.assertFalse(os.path.isfile(self.config.filename))
+
+    def test_returns_false_if_config_file_exists(self):
+        self.config = ConfigReader(self.file_path)
+        self.config.to_file()
         self.assertTrue(os.path.isfile(self.config.filename))
+        os.remove(self.config.filename)
 
     def test_returns_false_if_sections_not_exists(self):
         self.config = ConfigReader(self.file_path)
@@ -103,15 +118,6 @@ class TestConfigReaderTestCase(unittest.TestCase):
         self.config.set('Sample', 'Example', 'OtherSection')
         self.config.set('name', 'File', 'OtherSection')
         self.config.remove_section('main')
-        in_dict = {
-            'MainSection': {
-                'sample': 'Example'
-            },
-            'OtherSection': {
-                'sample': 'Example',
-                'name': 'File'
-            }
-        }
         s_io = StringIO()
         self.config.to_json(s_io)
         s_io.seek(0)
@@ -160,6 +166,45 @@ class TestConfigReaderTestCase(unittest.TestCase):
             expected = 'Not set'
             self.assertEqual(
                 self.config.get('default', default='Not set'), expected)
+
+    @unittest.skip
+    def test_returns_false_if_environment_variables_not_set(self):
+        self.config = ConfigReader(self.file_path)
+        self.config.set('country', 'Kenya')
+        self.config.set('continent', 'Africa')
+        self.config.set('state', None)
+        self.config.to_env()
+
+        with self.subTest(0):
+            self.assertEqual(os.environ['MAIN_COUNTRY'], 'Kenya')
+
+        with self.subTest(1):
+            self.assertEqual(os.environ['MAIN_CONTINENT'], 'Africa')
+
+        with self.subTest(2):
+            self.assertEqual(os.environ['MAIN_STATE'], 'None')
+
+    def test_returns_false_if_prepend_failed(self):
+        f = open('default.ini', 'w')
+        config = ConfigReader(self.file_path, f)
+        config.set('country', 'Kenya')
+        config.set('continent', 'Africa')
+        config.set('state', None)
+        config.set('count', '0', section='first')
+        config.to_env()
+        f.close()
+
+        with self.subTest(0):
+            self.assertEqual(os.environ.get('MAIN_COUNTRY'), 'Kenya')
+
+        with self.subTest(1):
+            self.assertEqual(os.environ.get('MAIN_CONTINENT'), 'Africa')
+
+        with self.subTest(2):
+            self.assertEqual(os.environ.get('MAIN_STATE'), 'None')
+
+        with self.subTest(3):
+            self.assertEqual(os.environ.get('FIRST_COUNT'), '0')
 
 
 if __name__ == "__main__":

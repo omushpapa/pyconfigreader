@@ -4,16 +4,16 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Coverage/5f3132cafe78478dbdeb081b53d3661d)](https://www.codacy.com/app/giantas/pyconfigreader?utm_source=github.com&utm_medium=referral&utm_content=giantas/pyconfigreader&utm_campaign=Badge_Coverage)
 [![Issues](https://img.shields.io/github/issues-raw/giantas/pyconfigreader/website.svg)](https://github.com/giantas/pyconfigreader/issues)
 
-A simple settings.ini handler in python
+A configuration file handler for the most basic stuff in ini files.
 
 ## Usage
 
 ```
-$ pip install pyconfigparser
+$ pip install pyconfigreader
 ```
 
 ```python
-from pyconfigreader.reader import ConfigReader
+from pyconfigreader import ConfigReader
 
 config = ConfigReader(filename='config.ini')
 config.set('Key', 'Value', section='Section')
@@ -22,11 +22,13 @@ config.set('okay', 'True')
 
 name = config.get('name')
 okay = config.get('okay')
+
+print(config.sections)
 ```
 For more info check: `help(config)`
 
 # More
 ... to be added
 
-# etc
+# License
 Distributed under [MIT](LICENSE)
