@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import os
+import sys
 import unittest
 from configparser import ConfigParser
 from io import StringIO
@@ -94,18 +95,6 @@ class TestConfigReaderTestCase(unittest.TestCase):
         self.config.set('Sample', 'Example', 'MainSection')
         self.config.set('Sample', 'Example', 'OtherSection')
         self.config.set('Name', 'File', 'OtherSection')
-        expected = {
-            'main': {
-                'reader': 'configreader'
-            },
-            'MainSection': {
-                'sample': 'Example'
-            },
-            'OtherSection': {
-                'sample': 'Example',
-                'name': 'File'
-            }
-        }
         self.assertIsInstance(
             self.config.show(output=False), dict)
 
@@ -308,8 +297,8 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(3):
             self.assertTrue(os.path.isfile(new_path))
 
-        #with self.subTest(4):
-        #    self.assertRaises(ValueError, f.readable())
+        with self.subTest(4):
+            self.assertRaises(ValueError, lambda: f.readable())
 
     def test_returns_false_if_contents_not_similar(self):
         f = open(self.file_path, 'w+')
@@ -356,6 +345,32 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with open(self.file_path, 'w+') as f:
             config = ConfigReader(file_object=f)
             self.assertEqual(config.filename, f.name)
+
+    def test_returns_false_if_changes_not_written_to_file(self):
+        config = ConfigReader(self.file_path)
+        config.set('name', 'first')
+
+        d = ConfigReader(self.file_path)
+        with self.subTest(0):
+            self.assertIsNone(d.get('name'))
+        config.set('name', 'last', commit=True)
+        d = ConfigReader(self.file_path)
+        with self.subTest(1):
+            self.assertEqual(d.get('name'), 'last')
+
+    def test_returns_false_if_option_not_removed_from_file(self):
+        config = ConfigReader(
+            os.path.join(self.tempdir.path, '{}.ini'.format(str(uuid4()))))
+        config.set('name', 'first', section='two')
+
+        with self.subTest(0):
+            self.assertEqual(config.get('name', section='two'), 'first')
+
+        config.remove_key('name', section='two',commit=True)
+
+        d = ConfigReader(self.file_path)
+        with self.subTest(1):
+            self.assertIsNone(d.get('name', section='two'))
 
 
 if __name__ == "__main__":

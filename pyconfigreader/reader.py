@@ -167,8 +167,8 @@ class ConfigReader(object):
 
                 for item in value.keys():
                     self.set(key=item,
-                                   value=value[item],
-                                   section=key)
+                             value=value[item],
+                             section=key)
             else:
                 section = self.__default_section
                 self._add_section(section)
@@ -217,7 +217,7 @@ class ConfigReader(object):
                     pass
         return value
 
-    def set(self, key, value, section=None):
+    def set(self, key, value, section=None, commit=False):
         """Sets the value of key to the provided value
 
         Section defaults to 'main' is not provided.
@@ -226,9 +226,11 @@ class ConfigReader(object):
         :param key: The key name
         :param value: The value to which the key is mapped
         :param section: The name of the section, defaults to 'main'
+        :param commit: Also write changes to ini file on disk
         :type key: str
         :type value: str
         :type section: str
+        :type commit: bool
         :returns: Nothing
         :rtype: None
         """
@@ -236,6 +238,8 @@ class ConfigReader(object):
         self._add_section(section)
         self.__parser.set(section, option=key, value=str(value))
         self._write_config()
+        if commit:
+            self.to_file()
 
     def remove_section(self, section):
         """Remove a section from the configuration file
@@ -246,28 +250,40 @@ class ConfigReader(object):
         :returns: Nothing
         :rtype: None
         """
-        self.__parser.read_file(self.__file_object)
+        self.__parser.read_file(self.__file_object, source=self.filename)
         self.__parser.remove_section(section)
         self.__file_object.seek(0)
         self.__parser.write(self.__file_object)
         self.__file_object.truncate()
 
-    def remove_option(self, key, section=None):
+    def remove_option(self, key, section=None, commit=False):
         """Remove an option from the configuration file
 
         :param key: The key name
         :param section: The section name, defaults to 'main'
+        :param commit: Also write changes to ini file on disk
         :type key: str
         :type section: str
+        :type commit: bool
         :returns: Nothing
         :rtype: None
         """
         section = section or self.__default_section
-        self.__parser.read_file(self.__file_object)
+        self.__file_object.seek(0)          # to avoid configparser.MissingSectionHeaderError
+        self.__parser.read_file(self.__file_object, source=self.filename)
         self.__parser.remove_option(section=section, option=key)
         self.__file_object.seek(0)
         self.__parser.write(self.__file_object)
         self.__file_object.truncate()
+        if commit:
+            self.to_file()
+
+    def remove_key(self, *args, **kwargs):
+        """Same as calling self.remove_option
+
+        This is just in case one is used to the key-value term pair
+        """
+        self.remove_option(*args, **kwargs)
 
     def show(self, output=True):
         """Prints out all the sections and
@@ -383,7 +399,7 @@ class ConfigReader(object):
         else:
             json.dump(config, file_object, indent=4)
 
-    def to_env(self, environment=os.environ):
+    def to_env(self, environment=None):
         """Export contents to an environment
 
         Exports by default to os.environ.
@@ -407,6 +423,7 @@ class ConfigReader(object):
         :returns: Nothing
         :rtype: None
         """
+        environment = environment or os.environ
         data = self.show(False)
 
         for section in data:
