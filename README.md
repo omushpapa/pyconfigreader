@@ -24,8 +24,12 @@ name = config.get('name')
 okay = config.get('okay')
 
 print(config.sections)
+
+key, value, section = config.search('config')
+
+help(config)
 ```
-For more info check: `help(config)`
+A lot more on `help(config)`
 
 # More
 ... to be added

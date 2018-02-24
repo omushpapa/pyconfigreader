@@ -8,6 +8,7 @@ from difflib import SequenceMatcher
 from configparser import (ConfigParser, NoSectionError,
                           NoOptionError, DuplicateSectionError)
 from io import StringIO
+from pyconfigreader.exceptions import ModeError, ThresholdError
 
 
 def get_defaults(filename):
@@ -35,10 +36,12 @@ def get_defaults(filename):
 class ConfigReader(object):
     """A simple configuration reader class for performing
     basic config file operations including reading, setting
-    and searching for values
+    and searching for values.
+
+    If file_object is an open file then filename shall point to it's path
 
     :param filename: The name of the final config file
-    :param file_object: A file-like object
+    :param file_object: A file-like object opened in mode w+
     :type filename: str
     :type file_object: io.TextIO or io.StringIO
     """
@@ -51,7 +54,7 @@ class ConfigReader(object):
     def __init__(self, filename='settings.ini', file_object=StringIO()):
         self.__parser = ConfigParser()
         self.__filename = self._set_filename(filename)
-        self.__file_object = file_object
+        self.__file_object = self._check_file_object(file_object)
         self._create_config()
 
     @property
@@ -70,12 +73,46 @@ class ConfigReader(object):
     def filename(self, value):
         self.__filename = self._set_filename(value)
         if not isinstance(self.__file_object, StringIO):
-            self.__file_object.close()
-            self.__file_object = open(self.__filename, 'w')
+            self.__file_object = self._get_new_object()
+
+    def _get_new_object(self):
+        """Copies the contents of the old file into a buffer
+        and deletes the old file.
+
+        To write to disk call to_file
+        """
+        new_io = StringIO()
+
+        self.__file_object.seek(0)
+        new_io.write(self.__file_object.read())
+
+        self.__file_object.close()
+        os.remove(self.__file_object.name)
+        return new_io
+
+    def _check_file_object(self, file_object):
+        """Check if file_object is readable and writable
+
+        If file_object if an open file, then self.filename is
+        set to point at the path of file_object.
+
+        :param file_object: StringIO or TextIO
+        :raises ModeError: If file_object is not readable and writable
+        :return: Returns the file object
+        :rtype: StringIO or TextIO
+        """
+        if not isinstance(file_object, StringIO):
+            if not file_object.readable() or not file_object.writable():
+                raise ModeError("Open file not in mode 'w+'")
+            self.__filename = os.path.abspath(file_object.name)
+        return file_object
 
     @staticmethod
     def _set_filename(value):
         """Set the file name provided to a full path
+
+        If the filename provided is not an absolute path
+        the ini file is stored at the home directory.
 
         :param value: The new file name or path
         :type value: str
@@ -86,7 +123,7 @@ class ConfigReader(object):
             full_path = value
         else:
             full_path = os.path.join(os.path.abspath(
-                os.path.dirname(__file__)), os.path.basename(value))
+                os.path.expanduser('~')), os.path.basename(value))
         return full_path
 
     def _add_section(self, section):
@@ -108,6 +145,7 @@ class ConfigReader(object):
         :returns: Nothing
         :rtype: None
         """
+        self.__file_object.seek(0)
         self.__parser.write(self.__file_object)
 
     def _create_config(self):
@@ -158,7 +196,7 @@ class ConfigReader(object):
         :type section: str
         :type evaluate: bool
         :type default: str
-        :returns: The value that is mapped to the key
+        :returns: The value that is mapped to the key or None if not found
         :rtype: str, int, float, bool or None
         """
         section = section or self.__default_section
@@ -231,7 +269,7 @@ class ConfigReader(object):
         self.__parser.write(self.__file_object)
         self.__file_object.truncate()
 
-    def print(self, output=True):
+    def show(self, output=True):
         """Prints out all the sections and
         returns a dictionary of the same
 
@@ -264,14 +302,16 @@ class ConfigReader(object):
     def search(self, value, case_sensitive=True,
                exact_match=False, threshold=0.36):
         """Returns a tuple containing the key, value and
-        section if the value matches, else empty tuple
+        section of the best match found, else empty tuple
 
-        If exact_match is True, checks if there exists a value
+        If exact_match is False, checks if there exists a value
         that matches above the threshold value. In this case,
         case_sensitive is ignored.
 
+        If exact_match is True then the value of case_sensitive matters.
+
         The threshold value should be 0, 1 or any value
-        between 0 and 1. The higher the value the more the accuracy
+        between 0 and 1. The higher the value the better the accuracy.
 
         :param value: The value to search for in the config file
         :param case_sensitive: Match case during search or not
@@ -281,35 +321,38 @@ class ConfigReader(object):
         :type case_sensitive: bool
         :type exact_match: bool
         :type threshold: float
-        :returns: A tuple of the option, value and section
+        :returns: A tuple of the key, value and section
         :rtype: tuple
         """
         if not 0 <= threshold <= 1:
-            raise AttributeError(
-                'threshold must be 0, 1 or any value between 0 and 1')
+            raise ThresholdError(
+                'threshold must be a float in the range of 0 to 1')
         lowered_value = value.lower()
-        result = ()
+        matches = []
         for section in self.sections:
             options = self.__parser.options(section)
 
-            for option in options:
-                found = self.get(option, section)
+            for key in options:
+                found = self.get(key, section, evaluate=False)
                 if exact_match:
                     if case_sensitive:
                         if value == found:
-                            result = (option, found, section)
+                            result = (key, found, section)
                             return result
                     else:
                         if lowered_value == found.lower():
-                            result = (option, found, section)
+                            result = (key, found, section)
                             return result
                 else:
                     ratio = SequenceMatcher(None, found, value).ratio()
                     if ratio >= threshold:
-                        result = (option, found, section)
-                        return result
-
-        return result
+                        result = (ratio, key, found, section)
+                        matches.append(result)
+        if matches:
+            best_match = sorted(matches, reverse=True)[0]
+            return tuple(best_match[1:])
+        else:
+            return ()
 
     def to_json(self, file_object=None):
         """Export config to JSON
@@ -320,7 +363,7 @@ class ConfigReader(object):
         Example
         -------
         >>> reader = ConfigReader()
-        >>> with open('abc.ini', 'w') as f:
+        >>> with open('config.json', 'w') as f:
         >>>    reader.to_json(f)
 
         or:
@@ -334,11 +377,11 @@ class ConfigReader(object):
         :returns: A string or the dumped JSON contents or nothing if file_object is provided
         :rtype: str or None
         """
-        config = self.print(output=False)
+        config = self.show(output=False)
         if file_object is None:
-            return json.dumps(config)
+            return json.dumps(config, indent=4)
         else:
-            json.dump(config, file_object)
+            json.dump(config, file_object, indent=4)
 
     def to_env(self, environment=os.environ):
         """Export contents to an environment
@@ -352,7 +395,7 @@ class ConfigReader(object):
         Example
         -------
         >>> reader = ConfigReader()
-        >>> reader.print(output=False)
+        >>> reader.show(output=False)
           {'main': {'reader': 'configreader'}}
         >>> reader.to_env()
         >>> import os
@@ -364,7 +407,7 @@ class ConfigReader(object):
         :returns: Nothing
         :rtype: None
         """
-        data = self.print(False)
+        data = self.show(False)
 
         for section in data:
             items = data[section]
@@ -378,6 +421,9 @@ class ConfigReader(object):
         """Write to file on disk
 
         Write the contents to a file on the disk.
+
+        If an open file was passed during instantiation, the
+        contents will be written without closing the file.
 
         :returns: Nothing
         :rtype: None
