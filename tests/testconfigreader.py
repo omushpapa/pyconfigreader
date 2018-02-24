@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 
 import os
-import sys
 import unittest
 from configparser import ConfigParser
 from io import StringIO
@@ -366,7 +365,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(0):
             self.assertEqual(config.get('name', section='two'), 'first')
 
-        config.remove_key('name', section='two',commit=True)
+        config.remove_key('name', section='two', commit=True)
 
         d = ConfigReader(self.file_path)
         with self.subTest(1):
