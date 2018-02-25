@@ -38,12 +38,16 @@ class ConfigReader(object):
     basic config file operations including reading, setting
     and searching for values.
 
+    It is preferred that the value of filename be an absolute path.
+    If filename is not an absolute path, then the configuration (ini) file
+    will be saved at the Home directory (the value of os.path.expanduser('~')).
+
     If file_object is an open file then filename shall point to it's path
 
     :param filename: The name of the final config file
     :param file_object: A file-like object opened in mode w+
     :type filename: str
-    :type file_object: io.TextIO or io.StringIO
+    :type file_object: _io.TextIOWrapper or TextIO or io.StringIO
     """
 
     __defaults = {
@@ -176,14 +180,14 @@ class ConfigReader(object):
 
         self._write_config()
 
-    def get(self, key, section=None, evaluate=True, default=None):
+    def get(self, key, section=None, evaluate=True, default=None, default_commit=False):
         """Return the value of the provided key
 
         Returns None if the key does not exist.
         The section defaults to 'main' if not provided.
-        If the value of the key does not exist and default is not None,
-        the variable default is returned. In this case, providing
-        section may be a good idea.
+        If the value of key does not exist and default is not None,
+        the value of default is returned. And if default_commit is True, then
+        the value of default is written to file on disk immediately.
 
         If evaluate is True, the returned values are evaluated to
         Python data types int, float and boolean.
@@ -192,10 +196,12 @@ class ConfigReader(object):
         :param section: The name of the section, defaults to 'main'
         :param evaluate: Determines whether to evaluate the acquired values into Python literals
         :param default: The value to return if the key is not found
+        :param default_commit: Also write the value of default to ini file on disk
         :type key: str
         :type section: str
         :type evaluate: bool
         :type default: str
+        :type default_commit: bool
         :returns: The value that is mapped to the key or None if not found
         :rtype: str, int, float, bool or None
         """
@@ -206,7 +212,7 @@ class ConfigReader(object):
         except (NoSectionError, NoOptionError):
             if default is not None:
                 value = default
-                self.set(key, default, section)
+                self.set(key, default, section, commit=default_commit)
         else:
             if evaluate:
                 try:
