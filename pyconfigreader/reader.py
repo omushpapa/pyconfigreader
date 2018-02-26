@@ -55,7 +55,7 @@ class ConfigReader(object):
     }
     __default_section = 'main'
 
-    def __init__(self, filename='settings.ini', file_object=StringIO()):
+    def __init__(self, filename='settings.ini', file_object=None):
         self.__parser = ConfigParser()
         self.__filename = self._set_filename(filename)
         self.__file_object = self._check_file_object(file_object)
@@ -105,6 +105,8 @@ class ConfigReader(object):
         :return: Returns the file object
         :rtype: StringIO or TextIO
         """
+        if file_object is None:
+            return StringIO()
         if not isinstance(file_object, StringIO):
             if not file_object.readable() or not file_object.writable():
                 raise ModeError("Open file not in mode 'w+'")
@@ -458,3 +460,12 @@ class ConfigReader(object):
         else:
             self.__file_object.flush()
             os.fsync(self.__file_object.fileno())
+
+    def close(self):
+        """Close the file-like object
+
+        caution:: Not closing the object might have it update any other
+        instance created later on.
+
+        """
+        self.__file_object.close()

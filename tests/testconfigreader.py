@@ -371,6 +371,12 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(1):
             self.assertIsNone(d.get('name', section='two'))
 
+    def test_returns_false_if_file_object_not_closed(self):
+        config = ConfigReader(self.file_path)
+        config.close()
+
+        self.assertRaises(ValueError, lambda: config.set('first', 'false'))
+
 
 if __name__ == "__main__":
     unittest.main()

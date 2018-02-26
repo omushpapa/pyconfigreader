@@ -26,11 +26,14 @@ name = config.get('name')
 okay = config.get('okay')
 section = config.get('Key', section='Section')
 
+agency = config.get('agency')  # agency is None, it doesn't exist
+
 print(config.sections)
 
 key, value, section = config.search('config')
 
 help(config)
+config.close()  # Don't forget to close the file object
 ```
 A lot more on `help(config)`
 
