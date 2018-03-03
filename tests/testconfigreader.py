@@ -162,13 +162,13 @@ class TestConfigReaderTestCase(unittest.TestCase):
             os.remove(filename)
         except FileNotFoundError:
             pass
-        #dr = ConfigParser()
-        #dr.read(filename)
-        #dr.add_section('main')
-        #dr.add_section('MainSection')
-        #dr.set('main', 'new', 'False')
-        #dr.set('MainSection', 'browser', 'default')
-        #dr.set('MainSection', 'header', 'False')
+        dr = ConfigParser()
+        dr.read(filename)
+        dr.add_section('main')
+        dr.add_section('MainSection')
+        dr.set('main', 'new', 'False')
+        dr.set('MainSection', 'browser', 'default')
+        dr.set('MainSection', 'header', 'False')
 
         with open(filename, "w") as config_file:
             #dr.write(config_file)
