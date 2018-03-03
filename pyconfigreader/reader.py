@@ -5,10 +5,18 @@ import ast
 import json
 import shutil
 from difflib import SequenceMatcher
-from configparser import (ConfigParser, NoSectionError,
-                          NoOptionError, DuplicateSectionError)
-from io import StringIO
 from pyconfigreader.exceptions import ModeError, ThresholdError
+
+try:
+    from ConfigParser import (ConfigParser, NoSectionError,
+                              NoOptionError, DuplicateSectionError)
+except ImportError:
+    from configparser import (ConfigParser, NoSectionError,
+                              NoOptionError, DuplicateSectionError)
+try:
+    from StringIO import StringIO as IO
+except ImportError:
+    from io import StringIO as IO
 
 
 def get_defaults(filename):
@@ -61,9 +69,15 @@ class ConfigReader(object):
         self.__file_object = self._check_file_object(file_object)
         self._create_config()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     @property
     def sections(self):
-        return self.__parser.sections()
+        return [str(i) for i in self.__parser.sections()]
 
     @sections.setter
     def sections(self, value):
@@ -76,8 +90,12 @@ class ConfigReader(object):
     @filename.setter
     def filename(self, value):
         self.__filename = self._set_filename(value)
-        if not isinstance(self.__file_object, StringIO):
+        try:
+            self.__file_object.mode
             self.__file_object = self._get_new_object()
+            self.__filename = self.__file_object.name
+        except AttributeError:
+            pass
 
     def _get_new_object(self):
         """Copies the contents of the old file into a buffer
@@ -85,10 +103,16 @@ class ConfigReader(object):
 
         To write to disk call to_file
         """
-        new_io = StringIO()
+        new_io = IO()
+        new_io.truncate(0)
 
         self.__file_object.seek(0)
-        new_io.write(self.__file_object.read())
+
+        content = self.__file_object.read()
+        try:
+            new_io.write(content)
+        except TypeError:
+            new_io.write(content.decode('utf-8'))
 
         self.__file_object.close()
         os.remove(self.__file_object.name)
@@ -106,10 +130,22 @@ class ConfigReader(object):
         :rtype: StringIO or TextIO
         """
         if file_object is None:
-            return StringIO()
-        if not isinstance(file_object, StringIO):
-            if not file_object.readable() or not file_object.writable():
-                raise ModeError("Open file not in mode 'w+'")
+            return IO()
+        if not isinstance(file_object, IO):
+            try:
+                mode = file_object.mode
+
+            except AttributeError:
+                try:
+                    file_object.read()
+
+                except IOError:
+                    raise ModeError("Open file not in mode 'w+'")
+
+            else:
+                if mode != 'w+':
+                    raise ModeError("Open file not in mode 'w+'")
+
             self.__filename = os.path.abspath(file_object.name)
         return file_object
 
@@ -222,7 +258,7 @@ class ConfigReader(object):
                 except (ValueError, SyntaxError):
                     # ValueError when normal string
                     # SyntaxError when empty
-                    pass
+                    value = str(value)
         return value
 
     def set(self, key, value, section=None, commit=False):
@@ -249,6 +285,21 @@ class ConfigReader(object):
         if commit:
             self.to_file()
 
+    def get_items(self, section):
+        """Returns a dictionary of items (keys and their values) from a section
+
+        :param section: The section from which items (key-value pairs) are to be read from
+        :type section: str
+        :return: A dictionary of keys and their values
+        :rtype: dict
+        """
+        d = {}
+        for i in self.__parser.items(section):
+            key = str(i[0])
+            value = str(i[1])
+            d[key] = value
+        return d
+
     def remove_section(self, section):
         """Remove a section from the configuration file
         whilst leaving the others intact
@@ -258,10 +309,12 @@ class ConfigReader(object):
         :returns: Nothing
         :rtype: None
         """
-        self.__parser.read_file(self.__file_object, source=self.filename)
+        try:
+            self.__parser.read_file(self.__file_object, source=self.filename)
+        except AttributeError:
+            self.__parser.readfp(self.__file_object, filename=self.filename)
         self.__parser.remove_section(section)
-        self.__file_object.seek(0)
-        self.__parser.write(self.__file_object)
+        self._write_config()
         self.__file_object.truncate()
 
     def remove_option(self, key, section=None, commit=False):
@@ -278,10 +331,12 @@ class ConfigReader(object):
         """
         section = section or self.__default_section
         self.__file_object.seek(0)          # to avoid configparser.MissingSectionHeaderError
-        self.__parser.read_file(self.__file_object, source=self.filename)
+        try:
+            self.__parser.read_file(self.__file_object, source=self.filename)
+        except AttributeError:
+            self.__parser.readfp(self.__file_object, filename=self.filename)
         self.__parser.remove_option(section=section, option=key)
-        self.__file_object.seek(0)
-        self.__parser.write(self.__file_object)
+        self._write_config()
         self.__file_object.truncate()
         if commit:
             self.to_file()
@@ -313,7 +368,7 @@ class ConfigReader(object):
 
             for option in options:
                 value = self.get(option, section)
-                configs[section][option] = value
+                configs[section][str(option)] = value
                 string += '\n{:>23}: {}'.format(option, value)
 
             string += '\n'
@@ -405,7 +460,11 @@ class ConfigReader(object):
         if file_object is None:
             return json.dumps(config, indent=4)
         else:
-            json.dump(config, file_object, indent=4)
+            try:
+                json.dump(config, file_object, indent=4)
+            except TypeError:
+                string = json.dumps(config, indent=4)
+                file_object.write(string.decode('utf-8'))
 
     def to_env(self, environment=None):
         """Export contents to an environment
@@ -453,7 +512,7 @@ class ConfigReader(object):
         :returns: Nothing
         :rtype: None
         """
-        if isinstance(self.__file_object, StringIO):
+        if isinstance(self.__file_object, IO):
             with open(self.filename, 'w') as config_file:
                 self.__file_object.seek(0)
                 shutil.copyfileobj(self.__file_object, config_file)
@@ -464,8 +523,11 @@ class ConfigReader(object):
     def close(self):
         """Close the file-like object
 
+        Saves contents to file on disk first.
+
         caution:: Not closing the object might have it update any other
         instance created later on.
 
         """
+        self.to_file()
         self.__file_object.close()

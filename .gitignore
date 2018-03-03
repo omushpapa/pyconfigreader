@@ -152,3 +152,4 @@ fabric.properties
 
 .idea/
 *.ini
+lcoverage.sh

@@ -1,2 +1,5 @@
 testfixtures==5.4.0
 setuptools==18.3.2
+unittest2==1.1.0
+tox
+coverage
