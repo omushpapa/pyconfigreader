@@ -460,6 +460,13 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(1):
             self.assertEqual(items, {'reader': 'configreader'})
 
+    def test_returns_false_if_object_not_context(self):
+        with ConfigReader(self.file_path) as config:
+            config.set('name', 'First', commit=True)
+            name = config.get('name')
+
+        self.assertEqual(name, 'First')
+
 
 if __name__ == "__main__":
     unittest.main()
