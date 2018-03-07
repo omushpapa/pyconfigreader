@@ -6,6 +6,7 @@ import json
 import shutil
 from difflib import SequenceMatcher
 from pyconfigreader.exceptions import ModeError, ThresholdError
+from collections import OrderedDict
 
 try:
     from ConfigParser import (ConfigParser, NoSectionError,
@@ -27,12 +28,12 @@ def get_defaults(filename):
     :returns: sections, keys and options read from the file
     :rtype: dict
     """
-    configs = {}
+    configs = OrderedDict()
     parser = ConfigParser()
     parser.read(filename)
 
     for section in parser.sections():
-        configs[section] = {}
+        configs[section] = OrderedDict()
         options = parser.options(section)
 
         for option in options:
@@ -58,9 +59,7 @@ class ConfigReader(object):
     :type file_object: _io.TextIOWrapper or TextIO or io.StringIO
     """
 
-    __defaults = {
-        'reader': 'configreader'
-    }
+    __defaults = OrderedDict([('reader', 'configreader')])
     __default_section = 'main'
 
     def __init__(self, filename='settings.ini', file_object=None):
@@ -204,7 +203,7 @@ class ConfigReader(object):
 
         for key in self.__defaults.keys():
             value = self.__defaults[key]
-            if isinstance(value, dict):
+            if isinstance(value, OrderedDict):
                 self._add_section(key)
 
                 for item in value.keys():
@@ -286,14 +285,15 @@ class ConfigReader(object):
             self.to_file()
 
     def get_items(self, section):
-        """Returns a dictionary of items (keys and their values) from a section
+        """Returns an OrderedDict of items (keys and their values) from a section
 
         :param section: The section from which items (key-value pairs) are to be read from
         :type section: str
         :return: A dictionary of keys and their values
         :rtype: dict
         """
-        d = {}
+        d = OrderedDict()
+        count = 0
         for i in self.__parser.items(section):
             key = str(i[0])
             value = str(i[1])
@@ -357,12 +357,12 @@ class ConfigReader(object):
         :returns: A dictionary mapping of sections, options and values
         :rtype: dict
         """
-        configs = {}
+        configs = OrderedDict()
         string = '{:-^50}'.format(
             os.path.basename(self.filename))
 
         for section in self.sections:
-            configs[section] = {}
+            configs[section] = OrderedDict()
             options = self.__parser.options(section)
             string += '\n{:^50}'.format(section)
 
@@ -531,3 +531,4 @@ class ConfigReader(object):
         """
         self.to_file()
         self.__file_object.close()
+        del self.__file_object
