@@ -1,7 +1,10 @@
 import pypandoc
 from setuptools import setup
 
-long_description = pypandoc.convert_file('README.md', 'rst')
+try:
+    long_description = pypandoc.convert_file('README.md', 'rst')
+except ImportError:
+    long_description = 'Usage available at http://github.com/giantas/pyconfigreade'
 
 setup(name='pyconfigreader',
       version='0.2.3',
