@@ -5,6 +5,8 @@ python:
 cache: pip
 install:
   - pip install -r requirements.txt
+before_install:
+  - sudo apt-get install pandoc
 script:
   - tox
 after-script:
