@@ -3,7 +3,7 @@ from setuptools import setup
 try:
     import pypandoc
     long_description = pypandoc.convert_file('README.md', 'rst')
-except (ImportError, OSError):
+except (ImportError, OSError, RuntimeError):
     long_description = 'Usage available at http://github.com/giantas/pyconfigreader'
 
 setup(name='pyconfigreader',
