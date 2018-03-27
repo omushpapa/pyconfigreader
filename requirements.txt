@@ -3,3 +3,4 @@ unittest2==1.1.0
 setuptools==18.3.2
 pypandoc==1.4
 coverage
+tox
