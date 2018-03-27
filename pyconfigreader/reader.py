@@ -1,11 +1,13 @@
 #! /usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import os
 import ast
 import json
 import shutil
 from difflib import SequenceMatcher
-from pyconfigreader.exceptions import ModeError, ThresholdError
+from pyconfigreader.exceptions import (ModeError, SectionNameNotAllowed,
+                                       ThresholdError, FileNotFoundError)
 from collections import OrderedDict
 
 try:
@@ -26,7 +28,7 @@ def get_defaults(filename):
     :param filename: the name of an existing ini file
     :type filename: str
     :returns: sections, keys and options read from the file
-    :rtype: dict
+    :rtype: OrderedDict
     """
     configs = OrderedDict()
     parser = ConfigParser()
@@ -49,7 +51,7 @@ class ConfigReader(object):
 
     It is preferred that the value of filename be an absolute path.
     If filename is not an absolute path, then the configuration (ini) file
-    will be saved at the Home directory (the value of os.path.expanduser('~')).
+    will be saved at the Current Working directory (the value of os.getcwd()).
 
     If file_object is an open file then filename shall point to it's path
 
@@ -161,10 +163,12 @@ class ConfigReader(object):
         :rtype: str
         """
         if os.path.isabs(value):
+            if not os.path.isdir(os.path.dirname(value)):
+                raise FileNotFoundError('Directory does not exist')
             full_path = value
         else:
             full_path = os.path.join(os.path.abspath(
-                os.path.expanduser('~')), os.path.basename(value))
+                os.getcwd()), os.path.basename(value))
         return full_path
 
     def _add_section(self, section):
@@ -175,6 +179,11 @@ class ConfigReader(object):
         :returns: Nothing
         :rtype: None
         """
+        if section.lower() == 'default':
+            raise SectionNameNotAllowed("Section name '{}' cannot be created. See "
+                                        "<https://stackoverflow.com/questions/124692/what-is-the-intended-use-of-the"
+                                        "-default-section-in-config-files-used-by-configpa>".format(section))
+
         try:
             self.__parser.add_section(section)
         except DuplicateSectionError:
@@ -217,6 +226,17 @@ class ConfigReader(object):
 
         self._write_config()
 
+    @staticmethod
+    def _evaluate(value):
+        try:
+            result = ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            # ValueError when normal string
+            # SyntaxError when empty
+            result = str(value)
+
+        return result
+
     def get(self, key, section=None, evaluate=True, default=None, default_commit=False):
         """Return the value of the provided key
 
@@ -243,21 +263,17 @@ class ConfigReader(object):
         :rtype: str, int, float, bool or None
         """
         section = section or self.__default_section
-        value = None
+        value = 'None'
         try:
             value = self.__parser.get(section, option=key)
         except (NoSectionError, NoOptionError):
             if default is not None:
                 value = default
                 self.set(key, default, section, commit=default_commit)
-        else:
-            if evaluate:
-                try:
-                    value = ast.literal_eval(value)
-                except (ValueError, SyntaxError):
-                    # ValueError when normal string
-                    # SyntaxError when empty
-                    value = str(value)
+
+        if evaluate:
+            value = self._evaluate(value)
+
         return value
 
     def set(self, key, value, section=None, commit=False):
@@ -287,16 +303,23 @@ class ConfigReader(object):
     def get_items(self, section):
         """Returns an OrderedDict of items (keys and their values) from a section
 
+        The values are evaluated into Python literals, if possible.
+
+        Returns None if section not found.
+
         :param section: The section from which items (key-value pairs) are to be read from
         :type section: str
-        :return: A dictionary of keys and their values
-        :rtype: dict
+        :return: An dictionary of keys and their values
+        :rtype: OrderedDict or None
         """
+
+        if section not in self.sections:
+            return None
+
         d = OrderedDict()
-        count = 0
         for i in self.__parser.items(section):
             key = str(i[0])
-            value = str(i[1])
+            value = self._evaluate(i[1])
             d[key] = value
         return d
 
@@ -519,6 +542,10 @@ class ConfigReader(object):
         else:
             self.__file_object.flush()
             os.fsync(self.__file_object.fileno())
+
+    def save(self):
+        """Same as :method: to_file"""
+        self.to_file()
 
     def close(self):
         """Close the file-like object

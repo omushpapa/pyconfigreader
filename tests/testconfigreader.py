@@ -1,11 +1,14 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import os
 import unittest2 as unittest
 from pyconfigreader import ConfigReader
-from pyconfigreader.exceptions import ThresholdError, ModeError
+from pyconfigreader.exceptions import (ThresholdError, SectionNameNotAllowed,
+                                       ModeError, FileNotFoundError)
 from uuid import uuid4
 from testfixtures import TempDirectory
+from collections import OrderedDict
 
 try:
     from configparser import ConfigParser
@@ -17,15 +20,12 @@ try:
 except ImportError:
     from io import StringIO
 
-try:
-    FileNotFoundError = FileNotFoundError
-except NameError:
-    FileNotFoundError = OSError
-
 
 class TestConfigReaderTestCase(unittest.TestCase):
 
     def setUp(self):
+        self.tempdir = TempDirectory()
+        self.tempdir.cleanup()
         self.tempdir = TempDirectory()
         self.file_path = os.path.join(self.tempdir.path, '{}.ini'.format(str(uuid4())))
         self.filename = os.path.basename(self.file_path)
@@ -46,7 +46,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
         with self.subTest(2):
             filename = os.path.join(
-                os.path.expanduser('~'), 'settings.ini')
+                os.getcwd(), 'settings.ini')
             config = ConfigReader()
             self.assertEqual(filename, config.filename)
 
@@ -78,45 +78,45 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
     def test_returns_false_if_config_file_exists(self):
         self.config = ConfigReader(self.file_path)
-        self.config.to_file()
+        self.config.save()
         self.assertTrue(os.path.isfile(self.config.filename))
         self.config.close()
         os.remove(self.config.filename)
 
     def test_returns_false_if_sections_not_exists(self):
-        self.config = ConfigReader(self.file_path)
-        self.config.set('Sample', 'Example', 'MainSection')
-        self.config.set('Sample', 'Example', 'OtherSection')
+        config = ConfigReader(self.file_path)
+        config.set('Sample', 'Example', 'MainSection')
+        config.set('Sample', 'Example', 'OtherSection')
         expected = ['MainSection', 'OtherSection', 'main']
         self.assertListEqual(
-            sorted(self.config.sections), sorted(expected))
-        self.config.close()
+            sorted(config.sections), sorted(expected))
+        config.close()
 
     def test_returns_false_if_section_not_removed(self):
-        self.config = ConfigReader(self.file_path)
-        self.config.set('Sample', 'Example', 'MainSection')
-        self.config.set('Sample', 'Example', 'OtherSection')
-        self.config.remove_section('main')
+        config = ConfigReader(self.file_path)
+        config.set('Sample', 'Example', 'MainSection')
+        config.set('Sample', 'Example', 'OtherSection')
+        config.remove_section('main')
         expected = ['MainSection', 'OtherSection']
         self.assertListEqual(
-            sorted(self.config.sections), sorted(expected))
-        self.config.close()
+            sorted(config.sections), sorted(expected))
+        config.close()
 
     def test_returns_false_if_key_not_removed(self):
-        self.config = ConfigReader(self.file_path)
-        self.config.set('Sample', 'Example', 'MainSection')
-        self.config.set('Sample', 'Example', 'OtherSection')
-        self.config.remove_option('Sample', 'MainSection')
+        config = ConfigReader(self.file_path)
+        config.set('Sample', 'Example', 'MainSection')
+        config.set('Sample', 'Example', 'OtherSection')
+        config.remove_option('Sample', 'MainSection')
 
         with self.subTest(0):
-            self.assertIsNone(self.config.get(
+            self.assertIsNone(config.get(
                 'Sample', section='MainSection'))
 
         with self.subTest(1):
             expected = ['MainSection', 'main', 'OtherSection']
             self.assertListEqual(sorted(
-                self.config.sections), sorted(expected))
-        self.config.close()
+                config.sections), sorted(expected))
+        config.close()
 
     def test_returns_false_if_dict_not_returned(self):
         self.config = ConfigReader(self.file_path)
@@ -156,45 +156,15 @@ class TestConfigReaderTestCase(unittest.TestCase):
         self.config.close()
 
     def test_returns_false_if_defaults_are_changed(self):
-        filename = os.path.join(
-            os.path.expanduser('~'), '{}.cfg'.format(str(uuid4())))
-        try:
-            os.remove(filename)
-        except FileNotFoundError:
-            pass
-        dr = ConfigParser()
-        dr.read(filename)
-        dr.add_section('main')
-        dr.add_section('MainSection')
-        dr.set('main', 'new', 'False')
-        dr.set('MainSection', 'browser', 'default')
-        dr.set('MainSection', 'header', 'False')
+        filename = os.path.join(os.path.expanduser('~'), 'settings.ini')
 
-        with open(filename, "w") as config_file:
-            #dr.write(config_file)
-            config_file.write('[main]\nnew = False\n')
+        config_file = open(filename, "w")
+        config_file.write('[main]\nnew = False\n')
+        config_file.close()
 
-        self.config = ConfigReader(filename)
-        self.config.set('browser', 'default', 'MainSection')
+        with ConfigReader(filename) as config:
+            self.assertFalse(config.get('new'))
 
-        with self.subTest(0):
-            result = self.config.get('new')
-            self.assertFalse(result)
-
-        with self.subTest(1):
-            expected = 'default'
-            self.assertEqual(
-                self.config.get('browser', section='MainSection'), expected)
-
-        with self.subTest(2):
-            self.assertIsNone(self.config.get('browser'))
-
-        with self.subTest(3):
-            expected = 'Not set'
-            self.assertEqual(
-                self.config.get('default', default='Not set'), expected)
-
-        self.config.close()
         os.remove(filename)
 
     def test_returns_false_if_environment_variables_not_set(self):
@@ -349,6 +319,10 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(3):
             self.assertTrue(os.path.isfile(new_path))
         config.close()
+        try:
+            os.remove(new_path)
+        except FileNotFoundError:
+            pass
 
     def test_returns_false_if_old_file_object_writable(self):
         f = open(self.file_path, 'w+')
@@ -361,6 +335,10 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
         self.assertRaises(ValueError, lambda: f.write(''))
         config.close()
+        try:
+            os.remove(new_path)
+        except FileNotFoundError:
+            pass
 
     def test_returns_false_if_contents_not_similar(self):
         f = open(self.file_path, 'w+')
@@ -379,6 +357,10 @@ class TestConfigReaderTestCase(unittest.TestCase):
             result = f2.read()
         self.assertEqual(result, expected)
         config.close()
+        try:
+            os.remove(new_path)
+        except FileNotFoundError:
+            pass
 
     def test_returns_false_if_file_object_cannot_update(self):
         f = open(self.file_path, 'w')
@@ -445,20 +427,49 @@ class TestConfigReaderTestCase(unittest.TestCase):
         config = ConfigReader(self.file_path)
         config.close()
 
-        self.assertRaises(ValueError, lambda: config.set('first', 'false'))
+        self.assertRaises(AttributeError,
+                          lambda: config.set('first', 'false'))
 
     def test_returns_false_if_items_not_match(self):
-        f_io = StringIO()
-        config = ConfigReader(file_object=f_io)
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        file_ = open(file_path, 'w+')
+
+        config = ConfigReader(filename='defaults.ini', file_object=file_)
+        config.remove_section('main')
+        config.set('start', 'True', section='defaults')
+        config.set('value', '45', section='defaults')
         items = config.get_items('main')
-        config.close()
-        f_io.close()
 
         with self.subTest(0):
-            self.assertIsInstance(items, dict)
+            self.assertIsNone(items)
+
+        items = config.get_items('defaults')
+
+        with self.subTest(0):
+            self.assertIsInstance(items, OrderedDict)
 
         with self.subTest(1):
-            self.assertEqual(items, {'reader': 'configreader'})
+            expected = OrderedDict([
+                ('start', True),
+                ('value', 45)
+            ])
+            self.assertEqual(items, expected)
+        config.close()
+
+    def test_returns_false_if_error_not_raised(self):
+        config = ConfigReader()
+
+        with self.subTest(0):
+            self.assertRaises(SectionNameNotAllowed,
+                              lambda: config.set('start', 'True', section='default'))
+
+        with self.subTest(1):
+            self.assertRaises(SectionNameNotAllowed,
+                              lambda: config.set('start', 'True', section='deFault'))
+
+        with self.subTest(2):
+            self.assertRaises(SectionNameNotAllowed,
+                              lambda: config.set('start', 'True', section='DEFAULT'))
 
     def test_returns_false_if_object_not_context(self):
         with ConfigReader(self.file_path) as config:
@@ -466,6 +477,31 @@ class TestConfigReaderTestCase(unittest.TestCase):
             name = config.get('name')
 
         self.assertEqual(name, 'First')
+
+    @unittest.skipIf(os.name == 'nt', 'Path for *NIX systems')
+    def test_returns_false_if_absolute_path_not_exist(self):
+        path = '/home/path/does/not/exist'
+
+        def call():
+            c = ConfigReader(path)
+
+        self.assertRaises(FileNotFoundError, call)
+
+    @unittest.skipIf(os.name != 'nt', 'Path for Windows systems')
+    def test_returns_false_if_abs_path_not_exist(self):
+        path = 'C:\\home\\path\\does\\not\\exist'
+
+        def call():
+            c = ConfigReader(path)
+
+        self.assertRaises(FileNotFoundError, call)
+
+    def test_returns_false_if_default_not_returned(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        with ConfigReader(file_path) as config:
+            value = config.get('members', default='10')
+
+        self.assertEqual(value, 10)
 
 
 if __name__ == "__main__":
