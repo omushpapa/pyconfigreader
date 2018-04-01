@@ -332,6 +332,7 @@ class ConfigReader(object):
         :returns: Nothing
         :rtype: None
         """
+        self.__file_object.seek(0)  # to avoid configparser.MissingSectionHeaderError
         try:
             self.__parser.read_file(self.__file_object, source=self.filename)
         except AttributeError:
