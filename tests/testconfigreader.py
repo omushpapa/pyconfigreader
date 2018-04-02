@@ -624,6 +624,25 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(2):
             self.assertEqual(config.get('suffix'), 'dir-drive-directory')
 
+    def test_returns_false_if_environment_variables_not_expanded(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        config = ConfigReader(file_path)
+        config.set('path', 'drive', section='test')
+        config.set('dir', '%(path)s-directory', section='test')
+        config.set('suffix', 'dir-%(dir)s', section='test')
+
+        environment = os.environ.copy()
+        config.to_env(environment)
+
+        with self.subTest(0):
+            self.assertEqual(environment['TEST_PATH'], 'drive')
+
+        with self.subTest(1):
+            self.assertEqual(environment['TEST_DIR'], 'drive-directory')
+
+        with self.subTest(2):
+            self.assertEqual(environment['TEST_SUFFIX'], 'dir-drive-directory')
+
 
 if __name__ == "__main__":
     unittest.main()

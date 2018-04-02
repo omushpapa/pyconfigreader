@@ -309,6 +309,9 @@ class ConfigReader(object):
         Section defaults to 'main' is not provided.
         The section is created if it does not exist.
 
+        When :param commit: is True, all changes up to the current
+        one are written to disk.
+
         :param key: The key name
         :param value: The value to which the key is mapped
         :param section: The name of the section, defaults to 'main'
@@ -591,7 +594,7 @@ class ConfigReader(object):
                       DeprecationWarning)
         self.save()
 
-    def close(self):
+    def close(self, save=True):
         """Close the file-like object
 
         Saves contents to file on disk first.
@@ -599,8 +602,11 @@ class ConfigReader(object):
         caution:: Not closing the object might have it update any other
         instance created later on.
 
+        :param save: write changes to disk
+        :type save: bool
         """
-        self.to_file()
+        if save:
+            self.save()
         self.__file_object.close()
         del self.__file_object
 
