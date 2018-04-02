@@ -13,7 +13,7 @@ from collections import OrderedDict
 try:
     from configparser import ConfigParser
 except ImportError:
-    from ConfigParser import ConfigParser
+    from ConfigParser import SafeConfigParser as ConfigParser
 
 try:
     from StringIO import StringIO
@@ -502,6 +502,127 @@ class TestConfigReaderTestCase(unittest.TestCase):
             value = config.get('members', default='10')
 
         self.assertEqual(value, 10)
+
+    def test_returns_false_if_prepend_fails(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        with ConfigReader(file_path) as config:
+            config.set('counter', 'default', section='team')
+            config.set('play', '1', section='team')
+
+        config.to_env()
+
+        with self.subTest(0):
+            self.assertEqual(os.environ['TEAM_COUNTER'], 'default')
+
+        with self.subTest(1):
+            self.assertEqual(os.environ['TEAM_PLAY'], '1')
+
+        with self.subTest(2):
+            def call():
+                return os.environ['PLAY']
+            self.assertRaises(KeyError, call)
+
+        config.to_env(prepend=False)
+
+        with self.subTest(3):
+            self.assertEqual(os.environ['PLAY'], '1')
+
+        with self.subTest(4):
+            self.assertEqual(os.environ['COUNTER'], 'default')
+
+    def test_returns_false_if_load_fails(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        config = ConfigReader(file_path, case_sensitive=True)
+        config.set('states', '35', section='country')
+        config.set('counties', 'None', section='country')
+
+        environment = os.environ.copy()
+        user = 'guest'
+        environment['USER'] = user
+        environment['COUNTER'] = 'never'
+
+        config.to_env(environment)
+        config.load_env(environment)
+
+        items = config.get_items('main')
+        with self.subTest(0):
+            self.assertEqual(items['HOME'], os.path.expanduser('~'))
+
+        with self.subTest(1):
+            self.assertEqual(items['USER'], user)
+
+        with self.subTest(2):
+            self.assertEqual(items['PWD'], os.environ['PWD'])
+
+        with self.subTest(3):
+            def call():
+                return items['home']
+            self.assertRaises(KeyError, call)
+
+        with self.subTest(4):
+            self.assertEqual(items['COUNTER'], 'never')
+
+    def test_returns_false_if_load_fails_case_insensitive(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        config = ConfigReader(file_path)
+        config.set('states', '35', section='country')
+        config.set('counties', 'None', section='country')
+
+        config.to_env()
+        config.load_env()
+
+        items = config.get_items('main')
+        with self.subTest(0):
+            self.assertEqual(items['home'], os.path.expanduser('~'))
+
+        with self.subTest(1):
+            self.assertEqual(items['user'], os.environ['USER'])
+
+        with self.subTest(2):
+            self.assertEqual(items['pwd'], os.environ['PWD'])
+
+        with self.subTest(3):
+            def call():
+                return items['PWD']
+            self.assertRaises(KeyError, call)
+
+    def test_returns_false_if_load_prefixed_fails(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        config = ConfigReader(file_path)
+        config.set('states', '35', section='countrymain')
+        config.set('counties', 'None', section='countrymain')
+
+        config.to_env()
+        config.remove_section('countrymain')
+        with self.subTest(0):
+            self.assertIsNone(config.get_items('countrymain'))
+        config.load_env(prefix='countrymain')
+
+        items = config.get_items('countrymain')
+        with self.subTest(1):
+            self.assertEqual(len(items), 2)
+
+        with self.subTest(2):
+            self.assertEqual(items['states'], 35)
+
+        with self.subTest(3):
+            self.assertIsNone(items['counties'])
+
+    def test_returns_false_if_variable_not_expanded(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        config = ConfigReader(file_path)
+        config.set('path', 'drive')
+        config.set('dir', '%(path)s-directory')
+        config.set('suffix', 'dir-%(dir)s')
+
+        with self.subTest(0):
+            self.assertEqual(config.get('path'), 'drive')
+
+        with self.subTest(1):
+            self.assertEqual(config.get('dir'), 'drive-directory')
+
+        with self.subTest(2):
+            self.assertEqual(config.get('suffix'), 'dir-drive-directory')
 
 
 if __name__ == "__main__":

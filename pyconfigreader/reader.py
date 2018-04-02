@@ -5,13 +5,14 @@ import os
 import ast
 import json
 import shutil
+import warnings
 from difflib import SequenceMatcher
 from pyconfigreader.exceptions import (ModeError, SectionNameNotAllowed,
                                        ThresholdError, FileNotFoundError)
 from collections import OrderedDict
 
 try:
-    from ConfigParser import (ConfigParser, NoSectionError,
+    from ConfigParser import (SafeConfigParser as ConfigParser, NoSectionError,
                               NoOptionError, DuplicateSectionError)
 except ImportError:
     from configparser import (ConfigParser, NoSectionError,
@@ -21,17 +22,24 @@ try:
 except ImportError:
     from io import StringIO as IO
 
+CASE_SENSITIVE = False
 
-def get_defaults(filename):
+
+def load_defaults(filename, case_sensitive=CASE_SENSITIVE):
     """Returns a dictionary of the configuration properties
 
     :param filename: the name of an existing ini file
+    :param case_sensitive: determines whether keys should retain their
+        alphabetic cases or be converted to lowercase
     :type filename: str
+    :type case_sensitive: bool
     :returns: sections, keys and options read from the file
     :rtype: OrderedDict
     """
     configs = OrderedDict()
     parser = ConfigParser()
+    if case_sensitive:
+        parser.optionxform = str
     parser.read(filename)
 
     for section in parser.sections():
@@ -57,15 +65,22 @@ class ConfigReader(object):
 
     :param filename: The name of the final config file
     :param file_object: A file-like object opened in mode w+
+    :param case_sensitive: Determines whether keys should retain their
+        alphabetic cases or be converted to lowercase
     :type filename: str
     :type file_object: _io.TextIOWrapper or TextIO or io.StringIO
+    :type case_sensitive: bool
     """
 
     __defaults = OrderedDict([('reader', 'configreader')])
     __default_section = 'main'
 
-    def __init__(self, filename='settings.ini', file_object=None):
+    def __init__(self, filename='settings.ini', file_object=None,
+                 case_sensitive=CASE_SENSITIVE):
         self.__parser = ConfigParser()
+        self.case_sensitive = case_sensitive
+        if case_sensitive:
+            self.__parser.optionxform = str
         self.__filename = self._set_filename(filename)
         self.__file_object = self._check_file_object(file_object)
         self._create_config()
@@ -207,7 +222,7 @@ class ConfigReader(object):
         :returns: Nothing
         :rtype: None
         """
-        defaults = get_defaults(self.filename)
+        defaults = load_defaults(self.filename, self.case_sensitive)
         self.__defaults.update(defaults)
 
         for key in self.__defaults.keys():
@@ -237,7 +252,19 @@ class ConfigReader(object):
 
         return result
 
-    def get(self, key, section=None, evaluate=True, default=None, default_commit=False):
+    @staticmethod
+    def _separate_prefix(key, prefix):
+        try:
+            r_key = key.rsplit(prefix + '_', 1)
+        except ValueError:
+            final_key = key
+        else:
+            final_key = ''.join(r_key)
+
+        return final_key
+
+    def get(self, key, section=None, evaluate=True,
+            default=None, default_commit=False):
         """Return the value of the provided key
 
         Returns None if the key does not exist.
@@ -295,7 +322,12 @@ class ConfigReader(object):
         """
         section = section or self.__default_section
         self._add_section(section)
-        self.__parser.set(section, option=key, value=str(value))
+        try:
+            self.__parser.set(section, option=key, value=str(value))
+        except ValueError:
+            # String interpolation error
+            value = value.replace('%', '%%').replace('%%(', '%(')
+            self.__parser.set(section, option=key, value=str(value))
         self._write_config()
         if commit:
             self.to_file()
@@ -489,14 +521,14 @@ class ConfigReader(object):
                 string = json.dumps(config, indent=4)
                 file_object.write(string.decode('utf-8'))
 
-    def to_env(self, environment=None):
+    def to_env(self, environment=None, prepend=True):
         """Export contents to an environment
 
         Exports by default to os.environ.
 
         By default, the section and option would be capitalised
         and joined by an underscore to form the key - as an
-        attempt at avoid collision with environment variables.
+        attempt at avoid collision with (any) environment variables.
 
         Example
         -------
@@ -507,9 +539,14 @@ class ConfigReader(object):
         >>> import os
         >>> os.environ['MAIN_READER']
           'configreader'
+        >>> reader.to_env(prepend=False)
+        >>> os.environ['READER']
+          'configreader'
 
         :param environment: An environment to export to
+        :param prepend: Prepend the section name to the key
         :type environment: os.environ
+        :type prepend: bool
         :returns: Nothing
         :rtype: None
         """
@@ -520,11 +557,15 @@ class ConfigReader(object):
             items = data[section]
 
             for item in items:
-                env_key = '{}_{}'.format(
-                    section.upper(), item.upper())
+                if prepend:
+                    env_key = '{}_{}'.format(
+                        section.upper(), item.upper())
+                else:
+                    env_key = item.upper()
+
                 environment[env_key] = str(items[item])
 
-    def to_file(self):
+    def save(self):
         """Write to file on disk
 
         Write the contents to a file on the disk.
@@ -543,9 +584,12 @@ class ConfigReader(object):
             self.__file_object.flush()
             os.fsync(self.__file_object.fileno())
 
-    def save(self):
-        """Same as :method: to_file"""
-        self.to_file()
+    def to_file(self):
+        """Same as :method save:"""
+        warnings.warn("The method 'to_file' has been renamed to 'save'. "
+                      "This alias will be removed in future versions.",
+                      DeprecationWarning)
+        self.save()
 
     def close(self):
         """Close the file-like object
@@ -559,3 +603,39 @@ class ConfigReader(object):
         self.to_file()
         self.__file_object.close()
         del self.__file_object
+
+    def load_env(self, environment=None, prefix='', commit=False):
+        """Load alphanumeric environment variables into configuration file
+
+        Default environment is provided by os.environ.
+
+        The :param prefix: is used to filter keys in the environment which
+        start with the value. This is an adaptive mode to the :method to_env:
+        which prepends the section to the key before loading it to the
+        environment.
+
+        warning:: skips variables with keys or values which contain % (percentage sign)
+
+        :param environment: the environment to load from
+        :param prefix: only keys which are prefixed with this string are loaded
+        :param commit: write to disk immediately
+        :type environment: os._Environ
+        :type prefix: str
+        :type commit: bool
+        :return: nothing
+        """
+        env = environment or os.environ
+        prefix = prefix.strip()
+        pref = prefix.upper()
+
+        if pref:
+            items = ((self._separate_prefix(k, pref), v)
+                     for k, v in env.items()
+                     if k.startswith(pref))
+
+            for key, value in items:
+                self.set(key, value, section=prefix, commit=commit)
+
+        else:
+            for key, value in env.items():
+                self.set(key, value, commit=commit)
