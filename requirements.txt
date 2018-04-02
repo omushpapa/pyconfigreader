@@ -4,3 +4,4 @@ setuptools==18.3.2
 pypandoc==1.4
 coverage
 tox
+codacy-coverage
