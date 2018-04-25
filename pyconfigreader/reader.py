@@ -117,7 +117,7 @@ class ConfigReader(object):
         """Copies the contents of the old file into a buffer
         and deletes the old file.
 
-        To write to disk call to_file
+        To write to disk call save
         """
         new_io = IO()
         new_io.truncate(0)
@@ -333,7 +333,7 @@ class ConfigReader(object):
             self.__parser.set(section, option=key, value=str(value))
         self._write_config()
         if commit:
-            self.to_file()
+            self.save()
 
     def get_items(self, section):
         """Returns an OrderedDict of items (keys and their values) from a section
@@ -389,7 +389,7 @@ class ConfigReader(object):
         :rtype: None
         """
         section = section or self.__default_section
-        self.__file_object.seek(0)          # to avoid configparser.MissingSectionHeaderError
+        self.__file_object.seek(0)  # to avoid configparser.MissingSectionHeaderError
         try:
             self.__parser.read_file(self.__file_object, source=self.filename)
         except AttributeError:
@@ -398,7 +398,7 @@ class ConfigReader(object):
         self._write_config()
         self.__file_object.truncate()
         if commit:
-            self.to_file()
+            self.save()
 
     def remove_key(self, *args, **kwargs):
         """Same as calling self.remove_option
@@ -524,6 +524,40 @@ class ConfigReader(object):
             except TypeError:
                 string = json.dumps(config, indent=4)
                 file_object.write(string.decode('utf-8'))
+
+    def load_json(self, filename='settings.json', section=None,
+                  identifier='@', encoding=None):
+        try:
+            f = open(filename, 'r', encoding=encoding)
+        except TypeError:
+            # Python 2
+            f = open(filename, 'rb')
+            if encoding is None:
+                contents = f.read()
+            else:
+                contents = f.read().decode(encoding)
+
+        else:
+            contents = f.read()
+
+        finally:
+            f.close()
+            data = json.loads(contents)
+
+        for key in data.keys():
+            value = data[key]
+            if key.startswith(identifier):
+                key = key[1:]
+                self._add_section(key)
+
+                for item in value.keys():
+                    self.set(key=item,
+                             value=value[item],
+                             section=key)
+            else:
+                _section = section or self.__default_section
+                self._add_section(_section)
+                self.set(key, value, _section)
 
     def to_env(self, environment=None, prepend=True):
         """Export contents to an environment

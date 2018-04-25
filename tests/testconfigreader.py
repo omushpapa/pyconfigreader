@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import os
+import json
+import codecs
 import unittest2 as unittest
 from pyconfigreader import ConfigReader
 from pyconfigreader.exceptions import (ThresholdError, SectionNameNotAllowed,
                                        ModeError, FileNotFoundError)
 from uuid import uuid4
-from testfixtures import TempDirectory
+from testfixtures import TempDirectory, compare
 from collections import OrderedDict
 
 try:
@@ -235,6 +237,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
         def edit_sections():
             config.sections = ['new_section']
+
         self.assertRaises(AttributeError, edit_sections)
         config.close()
 
@@ -314,7 +317,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(2):
             self.assertFalse(os.path.isfile(new_path))
 
-        config.to_file()
+        config.save()
 
         with self.subTest(3):
             self.assertTrue(os.path.isfile(new_path))
@@ -351,7 +354,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
         expected = f.read()
 
         config.filename = new_path
-        config.to_file()
+        config.save()
 
         with open(new_path) as f2:
             result = f2.read()
@@ -378,7 +381,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
                 result = f2.read()
             self.assertNotEqual(result, '')
 
-        config.to_file()
+        config.save()
 
         with self.subTest(1):
             with open(self.file_path) as f3:
@@ -520,6 +523,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(2):
             def call():
                 return os.environ['PLAY']
+
             self.assertRaises(KeyError, call)
 
         config.to_env(prepend=False)
@@ -557,6 +561,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(3):
             def call():
                 return items['home']
+
             self.assertRaises(KeyError, call)
 
         with self.subTest(4):
@@ -584,6 +589,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(3):
             def call():
                 return items['PWD']
+
             self.assertRaises(KeyError, call)
 
     def test_returns_false_if_load_prefixed_fails(self):
@@ -642,6 +648,78 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
         with self.subTest(2):
             self.assertEqual(environment['TEST_SUFFIX'], 'dir-drive-directory')
+
+    def test_returns_false_if_json_not_loaded_from_file(self):
+        file_path = os.path.join(self.tempdir.path, '{}.ini'.format(str(uuid4())))
+        json_file = os.path.join(self.tempdir.path, '{}.ini'.format(str(uuid4())))
+        d = {
+            'name': 'plannet',
+            'count': 2,
+            'skip': False,
+            'handlers': [
+                {
+                    'name': 'handler_1'
+                },
+                {
+                    'name': 'handler_2'
+                }
+            ],
+            '@counters': {
+                'start': {
+                    'name': 'scrollers',
+                    'count': 15
+                },
+                'mid': {
+                    'name': 'followers',
+                    'count': 0,
+                    'helpers': 'available'
+                },
+                'end': {
+                    'name': 'keepers',
+                    'count': 5
+                }
+            }
+        }
+
+        try:
+            j = open(json_file, 'w', encoding='utf-16')
+        except TypeError:
+            j = codecs.open(json_file, 'w', encoding='utf-16')
+            json.dump(d, j, ensure_ascii=False)
+        else:
+            json.dump(d, j, ensure_ascii=False)
+        finally:
+            j.close()
+
+        config = ConfigReader(file_path)
+        config.load_json(json_file, section='json_data', encoding='utf-16')
+
+        with self.subTest(0):
+            compare(config.get('name', section='json_data'), 'plannet')
+
+        with self.subTest(1):
+            self.assertFalse(config.get('skip', section='json_file'))
+
+        with self.subTest(2):
+            self.assertIsInstance(config.get_items('counters'), OrderedDict)
+
+        with self.subTest(3):
+            compare(config.get_items('counters'),
+                    OrderedDict([
+                        ('start', {
+                            'name': 'scrollers',
+                            'count': 15
+                        }),
+                        ('mid', {
+                            'name': 'followers',
+                            'count': 0,
+                            'helpers': 'available'
+                        }),
+                        ('end', {
+                            'name': 'keepers',
+                            'count': 5
+                        })
+                    ]))
 
 
 if __name__ == "__main__":
