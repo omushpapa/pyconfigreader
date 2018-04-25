@@ -527,6 +527,39 @@ class ConfigReader(object):
 
     def load_json(self, filename='settings.json', section=None,
                   identifier='@', encoding=None):
+        """Load config from JSON file
+
+        For instance:-
+
+        With :param identifier: as '@',
+
+        '@counters': {
+            'start': {
+                'name': 'scrollers',
+                'count': 15
+            },
+            'end': {
+                'name': 'keepers',
+                'count': 5
+            }
+        }
+
+        will result in a section
+
+        [counters]
+        start = {'name': 'scrollers', 'count': 15}
+        end = {'name': 'keepers', 'count': 5}
+
+        :param filename: name of the JSON file
+        :param section: config section name to save key and values by default
+        :param identifier: the prefix that identifies a key as a section name
+        :param encoding: encoding of the JSON file
+        :type filename: str
+        :type section: str
+        :type identifier: str
+        :type encoding: str
+        :return: nothing
+        """
         try:
             f = open(filename, 'r', encoding=encoding)
         except TypeError:
