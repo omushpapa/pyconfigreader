@@ -27,6 +27,10 @@ config = ConfigReader(filename='config.ini')
 config.set('version', '2')  # Saved to section `main`
 config.set('Key', 'Value', section='Section')   # Creates a section `Section` on-the-fly
 config.set('name', 'main')
+config.close(save=True)  # Save on close
+# Or explicitly call
+# config.save()
+# config.close()
 ```
 
 By default, changes are not immediately written to the file on disk but are kept in memory.
@@ -88,7 +92,7 @@ config.remove_option('reader')  # the reader option is always set by default
 # or config.remove_key('reader')
 config.set('name', 'first', section='Details')
 config.remove_option('name', section='Details')
-config.close()
+config.close(save=True)
 ```
 
 ## Sections
@@ -107,7 +111,7 @@ from pyconfigreader import ConfigReader
 config = ConfigReader(filename='config.ini')
 config.set('name', 'first', section='Details') # Creates section `Details`
 config.remove_section('Details')    # Removes section `Details` plus all the keys and values
-config.close()
+config.close(save=True)
 ```
 
 Section items can be acquired as dictionary values
@@ -118,7 +122,7 @@ config.set('name', 'first', section='Details')
 
 config.get_items('Details')
 # OrderedDict([('name', 'first')])
-config.close()
+config.close()  # Or config.close(save=True)
 ```
 
 ## Environment Variables
@@ -149,7 +153,7 @@ Another alternative is calling `to_file`
 from pyconfigreader import ConfigReader
 config = ConfigReader(filename='config.ini')
 config.set('name', 'first', section='Details')
-config.save() # or config.to_file()
+config.save()
 config.close()
 ```
 
