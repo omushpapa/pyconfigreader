@@ -662,7 +662,7 @@ class ConfigReader(object):
                       DeprecationWarning)
         self.save()
 
-    def close(self, save=True):
+    def close(self, save=False):
         """Close the file-like object
 
         Saves contents to file on disk first.
