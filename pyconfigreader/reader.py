@@ -57,19 +57,33 @@ class ConfigReader(object):
     basic config file operations including reading, setting
     and searching for values.
 
-    It is preferred that the value of filename be an absolute path.
-    If filename is not an absolute path, then the configuration (ini) file
-    will be saved at the Current Working directory (the value of os.getcwd()).
+    It is preferred that the value of ``filename`` be an absolute path.
+    If ``filename`` is not an absolute path, then the configuration (ini) file
+    will be saved at the Current Working directory (the value of ``os.getcwd()``).
 
-    If file_object is an open file then filename shall point to it's path
+    If ``file_object`` is an open file then ``filename`` shall point to it's path
 
-    :param filename: The name of the final config file
+    :usage:
+
+    >>> from pyconfigreader import ConfigReader
+    >>> config = ConfigReader(filename='config.ini')
+    >>> config.set('version', '2')  # Saved to section `main`
+    >>> config.set('Key', 'Value', section='Section')   # Creates a section `Section` on-the-fly
+    >>> config.set('name', 'main')
+    >>> name = config.get('name')
+    >>> default_section = config.get_items('main')
+    >>> config.close(save=True)  # Save on close
+    >>> # Or explicitly call
+    >>> # config.save()
+    >>> # config.close()
+
+    :param str filename: The name of the final config file
     :param file_object: A file-like object opened in mode w+
-    :param case_sensitive: Determines whether keys should retain their
+    :param bool case_sensitive: Determines whether keys should retain their
         alphabetic cases or be converted to lowercase
-    :type filename: str
-    :type file_object: _io.TextIOWrapper or TextIO or io.StringIO
-    :type case_sensitive: bool
+    :type file_object: Union[_io.TextIOWrapper, TextIO, io.StringIO]
+    :ivar str filename: Path to the ini file
+    :ivar OrderedDict sections: The sections in the ini file
     """
 
     __defaults = OrderedDict([('reader', 'configreader')])
@@ -117,7 +131,7 @@ class ConfigReader(object):
         """Copies the contents of the old file into a buffer
         and deletes the old file.
 
-        To write to disk call save
+        To write to disk call :func:`~reader.ConfigReader.save`
         """
         new_io = IO()
         new_io.truncate(0)
@@ -137,13 +151,13 @@ class ConfigReader(object):
     def _check_file_object(self, file_object):
         """Check if file_object is readable and writable
 
-        If file_object if an open file, then self.filename is
-        set to point at the path of file_object.
+        If file_object if an open file, then :attr:`reader.ConfigReader.filename`
+        is set to point at the path of file_object.
 
-        :param file_object: StringIO or TextIO
+        :param file_object: Union[StringIO, TextIO]
         :raises ModeError: If file_object is not readable and writable
         :return: Returns the file object
-        :rtype: StringIO or TextIO
+        :rtype: Union[StringIO, TextIO]
         """
         if file_object is None:
             return IO()
@@ -170,7 +184,8 @@ class ConfigReader(object):
         """Set the file name provided to a full path
 
         If the filename provided is not an absolute path
-        the ini file is stored at the home directory.
+        the ini file is stored at the current working directory -
+        the value of ``os.getcwd()``.
 
         :param value: The new file name or path
         :type value: str
@@ -268,16 +283,16 @@ class ConfigReader(object):
         """Return the value of the provided key
 
         Returns None if the key does not exist.
-        The section defaults to 'main' if not provided.
-        If the value of key does not exist and default is not None,
-        the value of default is returned. And if default_commit is True, then
-        the value of default is written to file on disk immediately.
+        The section defaults to **main** if not provided.
+        If the value of ``key`` does not exist and ``default`` is not None,
+        the value of ``default`` is returned. And if ``default_commit`` is True, then
+        the value of ``default`` is written to file on disk immediately.
 
-        If evaluate is True, the returned values are evaluated to
+        If ``evaluate`` is True, the returned values are evaluated to
         Python data types int, float and boolean.
 
         :param key: The key name
-        :param section: The name of the section, defaults to 'main'
+        :param section: The name of the section, defaults to **main**
         :param evaluate: Determines whether to evaluate the acquired values into Python literals
         :param default: The value to return if the key is not found
         :param default_commit: Also write the value of default to ini file on disk
@@ -287,7 +302,7 @@ class ConfigReader(object):
         :type default: str
         :type default_commit: bool
         :returns: The value that is mapped to the key or None if not found
-        :rtype: str, int, float, bool or None
+        :rtype: Union[str, int, float, bool, None]
         """
         section = section or self.__default_section
         value = 'None'
@@ -306,21 +321,20 @@ class ConfigReader(object):
     def set(self, key, value, section=None, commit=False):
         """Sets the value of key to the provided value
 
-        Section defaults to 'main' is not provided.
+        Section defaults to **main** if not provided.
         The section is created if it does not exist.
 
-        When :param commit: is True, all changes up to the current
+        When ``commit`` is True, all changes up to the current
         one are written to disk.
 
         :param key: The key name
         :param value: The value to which the key is mapped
-        :param section: The name of the section, defaults to 'main'
+        :param section: The name of the section, defaults to **main**
         :param commit: Also write changes to ini file on disk
         :type key: str
         :type value: str
         :type section: str
         :type commit: bool
-        :returns: Nothing
         :rtype: None
         """
         section = section or self.__default_section
@@ -340,12 +354,12 @@ class ConfigReader(object):
 
         The values are evaluated into Python literals, if possible.
 
-        Returns None if section not found.
+        Returns None if section is not found.
 
         :param section: The section from which items (key-value pairs) are to be read from
         :type section: str
         :return: An dictionary of keys and their values
-        :rtype: OrderedDict or None
+        :rtype: Union[OrderedDict, None]
         """
 
         if section not in self.sections:
@@ -380,7 +394,7 @@ class ConfigReader(object):
         """Remove an option from the configuration file
 
         :param key: The key name
-        :param section: The section name, defaults to 'main'
+        :param section: The section name, defaults to **main**
         :param commit: Also write changes to ini file on disk
         :type key: str
         :type section: str
@@ -401,7 +415,7 @@ class ConfigReader(object):
             self.save()
 
     def remove_key(self, *args, **kwargs):
-        """Same as calling self.remove_option
+        """Same as calling :func:`~reader.ConfigReader.remove_option`
 
         This is just in case one is used to the key-value term pair
         """
@@ -442,13 +456,12 @@ class ConfigReader(object):
         """Returns a tuple containing the key, value and
         section of the best match found, else empty tuple
 
-        If exact_match is False, checks if there exists a value
-        that matches above the threshold value. In this case,
-        case_sensitive is ignored.
+        If ``exact_match`` is False, checks if there exists a value that matches
+        above the threshold value. In this case, ``case_sensitive`` is ignored.
 
-        If exact_match is True then the value of case_sensitive matters.
+        If ``exact_match`` is True then the value of ``case_sensitive`` matters.
 
-        The threshold value should be 0, 1 or any value
+        The ``threshold`` value should be 0, 1 or any value
         between 0 and 1. The higher the value the better the accuracy.
 
         :param value: The value to search for in the config file
@@ -495,20 +508,20 @@ class ConfigReader(object):
     def to_json(self, file_object=None):
         """Export config to JSON
 
-        If a file_object is given, it is exported to it
+        If a ``file_object`` is given, it is exported to it
         else returned as called
 
-        Example
-        -------
+        :usage:
+
+        >>> # Example
         >>> reader = ConfigReader()
         >>> with open('config.json', 'w') as f:
-        >>>    reader.to_json(f)
-
-        or:
-
+        ...     reader.to_json(f)
+        >>> # or
         >>> from io import StringIO
         >>> s_io = StringIO()
         >>> reader.to_json(s_io)
+        >>> reader.close()
 
         :param file_object: A file-like object for the JSON content
         :type file_object: io.TextIO
@@ -529,26 +542,24 @@ class ConfigReader(object):
                   identifier='@', encoding=None):
         """Load config from JSON file
 
-        For instance:-
+        For instance::
 
-        With :param identifier: as '@',
-
-        '@counters': {
-            'start': {
-                'name': 'scrollers',
-                'count': 15
-            },
-            'end': {
-                'name': 'keepers',
-                'count': 5
+            # With ``identifier`` as '@',
+            '@counters': {
+                'start': {
+                    'name': 'scrollers',
+                    'count': 15
+                },
+                'end': {
+                    'name': 'keepers',
+                    'count': 5
+                }
             }
-        }
 
-        will result in a section
-
-        [counters]
-        start = {'name': 'scrollers', 'count': 15}
-        end = {'name': 'keepers', 'count': 5}
+            # will result in a section
+            [counters]
+            start = {'name': 'scrollers', 'count': 15}
+            end = {'name': 'keepers', 'count': 5}
 
         :param filename: name of the JSON file
         :param section: config section name to save key and values by default
@@ -595,24 +606,25 @@ class ConfigReader(object):
     def to_env(self, environment=None, prepend=True):
         """Export contents to an environment
 
-        Exports by default to os.environ.
+        Exports by default to ``os.environ()``.
 
         By default, the section and option would be capitalised
         and joined by an underscore to form the key - as an
         attempt at avoid collision with (any) environment variables.
 
-        Example
-        -------
+        :usage:
+
         >>> reader = ConfigReader()
         >>> reader.show(output=False)
-          {'main': {'reader': 'configreader'}}
+        OrderedDict([('main', OrderedDict([('reader', 'configreader')]))])
         >>> reader.to_env()
         >>> import os
         >>> os.environ['MAIN_READER']
-          'configreader'
+        'configreader'
         >>> reader.to_env(prepend=False)
         >>> os.environ['READER']
-          'configreader'
+        'configreader'
+        >>> reader.close()
 
         :param environment: An environment to export to
         :param prepend: Prepend the section name to the key
@@ -641,8 +653,8 @@ class ConfigReader(object):
 
         Write the contents to a file on the disk.
 
-        If an open file was passed during instantiation, the
-        contents will be written without closing the file.
+        This does not close the file. You have to explicitly call
+        :func:`~reader.ConfigReader.close` to do so.
 
         :returns: Nothing
         :rtype: None
@@ -656,7 +668,12 @@ class ConfigReader(object):
             os.fsync(self.__file_object.fileno())
 
     def to_file(self):
-        """Same as :method save:"""
+        """Same as :func:`~reader.ConfigReader.save`
+
+        .. WARNING::
+           This method has been renamed to :func:`~reader.ConfigReader.save`.
+           This alias will be removed in future versions.
+        """
         warnings.warn("The method 'to_file' has been renamed to 'save'. "
                       "This alias will be removed in future versions.",
                       DeprecationWarning)
@@ -665,10 +682,11 @@ class ConfigReader(object):
     def close(self, save=False):
         """Close the file-like object
 
-        Saves contents to file on disk first.
+        If ``save`` is True, the contents are written to the file on disk first .
 
-        caution:: Not closing the object might have it update any other
-        instance created later on.
+        .. CAUTION::
+           Not closing the object might have it update any other
+           instance created later on.
 
         :param save: write changes to disk
         :type save: bool
@@ -681,14 +699,12 @@ class ConfigReader(object):
     def load_env(self, environment=None, prefix='', commit=False):
         """Load alphanumeric environment variables into configuration file
 
-        Default environment is provided by os.environ.
+        Default environment is provided by ``os.environ()``.
 
-        The :param prefix: is used to filter keys in the environment which
-        start with the value. This is an adaptive mode to the :method to_env:
+        The ``prefix`` is used to filter keys in the environment which
+        start with the value. This is an adaptive mode to :func:`~reader.ConfigReader.to_env`
         which prepends the section to the key before loading it to the
         environment.
-
-        warning:: skips variables with keys or values which contain % (percentage sign)
 
         :param environment: the environment to load from
         :param prefix: only keys which are prefixed with this string are loaded
