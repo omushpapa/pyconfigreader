@@ -23,6 +23,8 @@ except ImportError:
     from io import StringIO as IO
 
 CASE_SENSITIVE = False
+ALLOW_NO_VALUE = True
+DEFAULT_DICT = OrderedDict([('reader', 'configreader')])
 
 
 def load_defaults(filename, case_sensitive=CASE_SENSITIVE):
@@ -37,7 +39,7 @@ def load_defaults(filename, case_sensitive=CASE_SENSITIVE):
     :rtype: OrderedDict
     """
     configs = OrderedDict()
-    parser = ConfigParser()
+    parser = ConfigParser(allow_no_value=ALLOW_NO_VALUE)
     if case_sensitive:
         parser.optionxform = str
     parser.read(filename)
@@ -77,21 +79,23 @@ class ConfigReader(object):
     >>> # config.save()
     >>> # config.close()
 
-    :param str filename: The name of the final config file
-    :param file_object: A file-like object opened in mode w+
+    :param str filename: The name of the final config file. Defaults to `settings.ini`.
+    :param file_object: A file-like object opened in mode w+.
+        Defaults to a new StringIO object.
     :param bool case_sensitive: Determines whether keys should retain their
-        alphabetic cases or be converted to lowercase
+        alphabetic cases or be converted to lowercase. Defaults to `True`.
     :type file_object: Union[_io.TextIOWrapper, TextIO, io.StringIO]
+
     :ivar str filename: Path to the ini file
     :ivar OrderedDict sections: The sections in the ini file
     """
 
-    __defaults = OrderedDict([('reader', 'configreader')])
+    __defaults = DEFAULT_DICT
     __default_section = 'main'
 
     def __init__(self, filename='settings.ini', file_object=None,
                  case_sensitive=CASE_SENSITIVE):
-        self.__parser = ConfigParser()
+        self.__parser = ConfigParser(allow_no_value=ALLOW_NO_VALUE)
         self.case_sensitive = case_sensitive
         if case_sensitive:
             self.__parser.optionxform = str
@@ -160,7 +164,7 @@ class ConfigReader(object):
         :rtype: Union[StringIO, TextIO]
         """
         if file_object is None:
-            return IO()
+            file_object = IO()
         if not isinstance(file_object, IO):
             try:
                 mode = file_object.mode
@@ -177,6 +181,7 @@ class ConfigReader(object):
                     raise ModeError("Open file not in mode 'w+'")
 
             self.__filename = os.path.abspath(file_object.name)
+
         return file_object
 
     @staticmethod
@@ -227,6 +232,11 @@ class ConfigReader(object):
         """
         self.__file_object.seek(0)
         self.__parser.write(self.__file_object)
+
+    def reload(self):
+        """Reload the configuration file into memory"""
+        self.__defaults = DEFAULT_DICT
+        self._create_config()
 
     def _create_config(self):
         """Initialise an ini file from the defaults provided
@@ -344,7 +354,7 @@ class ConfigReader(object):
         except ValueError:
             # String interpolation error
             value = value.replace('%', '%%').replace('%%(', '%(')
-            self.__parser.set(section, option=key, value=str(value))
+            self.__parser.set(section, option=key, value=value)
         self._write_config()
         if commit:
             self.save()
@@ -666,18 +676,6 @@ class ConfigReader(object):
         else:
             self.__file_object.flush()
             os.fsync(self.__file_object.fileno())
-
-    def to_file(self):
-        """Same as :func:`~reader.ConfigReader.save`
-
-        .. WARNING::
-           This method has been renamed to :func:`~reader.ConfigReader.save`.
-           This alias will be removed in future versions.
-        """
-        warnings.warn("The method 'to_file' has been renamed to 'save'. "
-                      "This alias will be removed in future versions.",
-                      DeprecationWarning)
-        self.save()
 
     def close(self, save=False):
         """Close the file-like object
