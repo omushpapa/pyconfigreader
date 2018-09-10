@@ -5,7 +5,6 @@ import os
 import ast
 import json
 import shutil
-import warnings
 from difflib import SequenceMatcher
 from pyconfigreader.exceptions import (ModeError, SectionNameNotAllowed,
                                        ThresholdError, FileNotFoundError)
