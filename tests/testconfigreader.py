@@ -635,7 +635,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
             self.assertEqual(items['USER'], user)
 
         with self.subTest(2):
-            self.assertEqual(items['CD'], os.environ['CD'])
+            self.assertEqual(items['ALLUSERSPROFILE'], os.environ['ALLUSERSPROFILE'])
 
         with self.subTest(3):
             def call():
@@ -661,7 +661,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
             self.assertEqual(items['appdata'], os.environ['APPDATA'])
 
         with self.subTest(1):
-            self.assertEqual(items['cd'], os.environ['CD'])
+            self.assertEqual(items['allusersprofile'], os.environ['ALLUSERSPROFILE'])
 
         with self.subTest(2):
             self.assertEqual(items['homedrive'], os.environ['HOMEDRIVE'])
@@ -852,7 +852,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
                 compare(config.get('app_data'), os.environ['APPDATA'])
 
             with self.subTest(1):
-                compare(config.get('cd', default='$CD'), os.environ['CD'])
+                compare(config.get('all_users_profile', default='$ALLUSERSPROFILE'), os.environ['ALLUSERSPROFILE'])
 
 if __name__ == "__main__":
     unittest.main()
