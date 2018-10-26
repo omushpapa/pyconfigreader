@@ -552,6 +552,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(4):
             self.assertEqual(os.environ['COUNTER'], 'default')
 
+    @unittest.skipIf(os.name == 'nt', 'Testing environment variable for Windows')
     def test_returns_false_if_load_fails(self):
         file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
         config = ConfigReader(file_path, case_sensitive=True)
@@ -585,6 +586,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(4):
             self.assertEqual(items['COUNTER'], 'never')
 
+    @unittest.skipIf(os.name == 'nt', 'Testing environment variable for Linux')
     def test_returns_false_if_load_fails_case_insensitive(self):
         file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
         config = ConfigReader(file_path)
@@ -603,6 +605,66 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
         with self.subTest(2):
             self.assertEqual(items['pwd'], os.environ['PWD'])
+
+        with self.subTest(3):
+            def call():
+                return items['PWD']
+
+            self.assertRaises(KeyError, call)
+
+    @unittest.skipIf(os.name != 'nt', 'Testing environment variable for Windows')
+    def test_returns_false_if_load_fails(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        config = ConfigReader(file_path, case_sensitive=True)
+        config.set('states', '35', section='country')
+        config.set('counties', 'None', section='country')
+
+        environment = os.environ.copy()
+        user = 'guest'
+        environment['USER'] = user
+        environment['COUNTER'] = 'never'
+
+        config.to_env(environment)
+        config.load_env(environment)
+
+        items = config.get_items('main')
+        with self.subTest(0):
+            self.assertEqual(items['APPDATA'], os.environ['APPDATA'])
+
+        with self.subTest(1):
+            self.assertEqual(items['USER'], user)
+
+        with self.subTest(2):
+            self.assertEqual(items['DATE'], os.environ['DATE'])
+
+        with self.subTest(3):
+            def call():
+                return items['home']
+
+            self.assertRaises(KeyError, call)
+
+        with self.subTest(4):
+            self.assertEqual(items['COUNTER'], 'never')
+
+    @unittest.skipIf(os.name != 'nt', 'Testing environment variable for Linux')
+    def test_returns_false_if_load_fails_case_insensitive(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        config = ConfigReader(file_path)
+        config.set('states', '35', section='country')
+        config.set('counties', 'None', section='country')
+
+        config.to_env()
+        config.load_env()
+
+        items = config.get_items('main')
+        with self.subTest(0):
+            self.assertEqual(items['appdata'], os.environ['APPDATA'])
+
+        with self.subTest(1):
+            self.assertEqual(items['date'], os.environ['DATE'])
+
+        with self.subTest(2):
+            self.assertEqual(items['homedrive'], os.environ['HOMEDRIVE'])
 
         with self.subTest(3):
             def call():
