@@ -8,7 +8,9 @@ A configuration file handler for the most basic stuff in ini files that will get
 
 `ConfigReader` uses Python's ConfigParser to parse config files.
 
-***PS***: This is just to get you working on other stuff and not focus on config files. If you need advanced features head to [Python's ConfigParser](https://docs.python.org/3/library/configparser.html).
+***PS***: This is just to get you working on other stuff and not focus on config files. 
+If you need advanced features head to [Python's ConfigParser](https://docs.python.org/3/library/configparser.html) or 
+read [pyconfigreader's documentation](https://pyconfigreader.readthedocs.io/).
 
 # Usage
 
@@ -53,7 +55,7 @@ name = config.get('name')
 okay = config.get('okay')
 section = config.get('Key', section='Section')  # Get from the section `Section`
 
-agency = config.get('agency')  # agency is None, it doesn't exist
+agency = config.get('agency')  # Raises NoOptionError
 
 print(config.sections)  # Get a list of sections
 
@@ -63,7 +65,7 @@ help(config)
 config.close()  # Don't forget to close the file object
 ```
 
-Sometimes, if a key is not available a return value may be added
+Sometimes, if a key is not available a return value may be added using the `default` argument
 ```python
 from pyconfigreader import ConfigReader
 config = ConfigReader(filename='config.ini')
@@ -71,7 +73,8 @@ name = config.get('country', default='Kenya')   # Returns Kenya since key was no
 config.close()
 ```
 
-The return value, by default, is not saved to file but this can be enabled by setting default_commit=True
+The return value, by default, is not saved to file but this can be enabled by 
+setting `default_commit`=True
 ```python
 from pyconfigreader import ConfigReader
 config = ConfigReader(filename='config.ini')
@@ -179,7 +182,7 @@ reader.close()
 A lot more on `help(config)`
 
 # More
-Docs to come :)
+See [pyconfigreader documentation](https://pyconfigreader.readthedocs.io/).
 
 # License
 Distributed under [MIT](LICENSE)

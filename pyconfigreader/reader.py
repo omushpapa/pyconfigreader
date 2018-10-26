@@ -310,6 +310,7 @@ class ConfigReader(object):
         :type evaluate: bool
         :type default: str
         :type default_commit: bool
+        :raises NoOptionError: When the key whose value is being fetched does not exist
         :returns: The value that is mapped to the key or None if not found
         :rtype: Union[str, int, float, bool, None]
         """
@@ -317,10 +318,18 @@ class ConfigReader(object):
         value = 'None'
         try:
             value = self.__parser.get(section, option=key)
-        except (NoSectionError, NoOptionError):
+
+        except NoSectionError:
             if default is not None:
                 value = default
                 self.set(key, default, section, commit=default_commit)
+
+        except NoOptionError as error:
+            if default is not None:
+                value = default
+                self.set(key, default, section, commit=default_commit)
+            else:
+                raise error
 
         if evaluate:
             value = self._evaluate(value)

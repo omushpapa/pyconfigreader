@@ -13,9 +13,9 @@ from testfixtures import TempDirectory, compare
 from collections import OrderedDict
 
 try:
-    from configparser import ConfigParser
+    from configparser import ConfigParser, NoOptionError
 except ImportError:
-    from ConfigParser import SafeConfigParser as ConfigParser
+    from ConfigParser import SafeConfigParser as ConfigParser, NoOptionError
 
 try:
     from StringIO import StringIO
@@ -111,8 +111,10 @@ class TestConfigReaderTestCase(unittest.TestCase):
         config.remove_option('Sample', 'MainSection')
 
         with self.subTest(0):
-            self.assertIsNone(config.get(
-                'Sample', section='MainSection'))
+            def raises_error():
+                config.get('Sample', section='MainSection')
+
+            self.assertRaises(NoOptionError, raises_error)
 
         with self.subTest(1):
             expected = ['MainSection', 'main', 'OtherSection']
@@ -127,11 +129,6 @@ class TestConfigReaderTestCase(unittest.TestCase):
         self.config.set('Name', 'File', 'OtherSection')
         self.assertIsInstance(
             self.config.show(output=False), dict)
-        self.config.close()
-
-    def test_returns_false_if_key_exists(self):
-        self.config = ConfigReader(self.file_path)
-        self.assertIsNone(self.config.get('Sample'))
         self.config.close()
 
     def test_returns_false_if_json_not_dumped(self):
@@ -222,14 +219,17 @@ class TestConfigReaderTestCase(unittest.TestCase):
             self.assertEqual(config.get('empty'), '')
 
         with self.subTest(2):
-            self.assertIsNone(config.get('count'))
+            def raises_error():
+                config.get('count')
+
+            self.assertRaises(NoOptionError, raises_error)
 
         with self.subTest(3):
             self.assertEqual(
                 config.get('count', section='first'), 0)
 
         with self.subTest(4):
-            self.assertIsNone(config.get('None'))
+            self.assertIsNone(config.get('None', default='None'))
         config.close()
 
     def test_returns_false_if_exception_not_raised(self):
@@ -401,7 +401,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
         d = ConfigReader(self.file_path)
         with self.subTest(0):
-            self.assertIsNone(d.get('name'))
+            self.assertIsNone(d.get('name', default='None'))
         config.set('name', 'last', commit=True)
         config.close()
 
@@ -721,6 +721,33 @@ class TestConfigReaderTestCase(unittest.TestCase):
                         })
                     ]))
 
+    def test_returns_false_if_option_found(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        config = ConfigReader(file_path)
+        config.set('path', 'drive', section='test')
+
+        with self.subTest(0):
+            compare(config.get('path', 'test'), 'drive')
+
+        with self.subTest(1):
+            def get_unset_value():
+                config.get('busy', section='test')
+            self.assertRaises(NoOptionError, get_unset_value)
+
+        config.close()
+
+    def test_returns_false_if_option_with_default_found(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        config = ConfigReader(file_path)
+        config.set('path', 'drive', section='test')
+
+        with self.subTest(0):
+            compare(config.get('path', 'test'), 'drive')
+
+        with self.subTest(1):
+            compare(config.get('busy', section='test', default='not really'), 'not really')
+
+        config.close()
 
 if __name__ == "__main__":
     unittest.main()
