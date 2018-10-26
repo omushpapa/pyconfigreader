@@ -272,7 +272,7 @@ class ConfigReader(object):
         except (ValueError, SyntaxError):
             # ValueError when normal string
             # SyntaxError when empty
-            result = str(value)
+            result = os.path.expandvars(str(value))
 
         return result
 

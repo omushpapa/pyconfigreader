@@ -37,6 +37,24 @@ class TestConfigReaderTestCase(unittest.TestCase):
     def tearDown(self):
         self.tempdir.cleanup()
 
+    def test_returns_false_if_key_not_set(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        with ConfigReader(file_path) as config:
+            config.set('%name', '2')
+            config.set('num%ber', '%23')
+
+            with self.subTest(0):
+                def raises_error():
+                    config.set('attr', '%(num')
+
+                self.assertRaises(ValueError, raises_error)
+
+            with self.subTest(1):
+                compare(config.get('%name'), 2)
+
+            with self.subTest(2):
+                compare(config.get('num%ber'), '%23')
+
     def test_returns_false_if_filename_not_absolute(self):
         with self.subTest(0):
             config = ConfigReader(self.file_path)
@@ -748,6 +766,31 @@ class TestConfigReaderTestCase(unittest.TestCase):
             compare(config.get('busy', section='test', default='not really'), 'not really')
 
         config.close()
+
+    @unittest.skipIf(os.name == 'nt', 'Testing environment variables for Linux')
+    def test_returns_false_if_environment_not_loaded_by_default(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        with ConfigReader(file_path) as config:
+            config.set('home', '$HOME')
+            config.set('user', '$USER')
+
+            with self.subTest(0):
+                compare(config.get('home'), os.environ['HOME'])
+
+            with self.subTest(1):
+                compare(config.get('host', default='$HOST'), os.environ['HOST'])
+
+    @unittest.skipIf(os.name != 'nt', 'Testing environment variables for Windows')
+    def test_returns_false_if_environment_not_loaded_by_default(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        with ConfigReader(file_path) as config:
+            config.set('app_data', '$APPDATA')
+
+            with self.subTest(0):
+                compare(config.get('app_data'), os.environ['APPDATA'])
+
+            with self.subTest(1):
+                compare(config.get('date', default='$DATE'), os.environ['DATE'])
 
 if __name__ == "__main__":
     unittest.main()
