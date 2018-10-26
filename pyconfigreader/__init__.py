@@ -9,4 +9,4 @@ Tested with Python 2.7, 3.4, 3.5 and 3.6.
 
 from .reader import ConfigReader
 
-__version__ = '0.3.3'
+__version__ = '0.4.0'
