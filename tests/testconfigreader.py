@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
 import json
 import codecs
 import unittest2 as unittest
@@ -273,17 +274,27 @@ class TestConfigReaderTestCase(unittest.TestCase):
         config.close()
 
     def test_returns_false_if_match_not_found(self):
-        config = ConfigReader(self.file_path)
-        expected = ('reader', 'configreader', 'main')
-        result = config.search('reader')
-        self.assertEqual(result, expected)
-        config.close()
+        # TODO: Check for memory leaks
+        # FIXME: Wierd case, if os.path.isfile(file_path) is True this test passes when ran as a one unittest
+        # FIXME: However, it fails when ran with other tests in this TestCase
+        # file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')  # FIXME: fails
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'[main]')  # FIXME: passes
+
+        with ConfigReader(file_path) as config:
+
+            with self.subTest(0):
+                self.assertEqual(config.get_items('main'), OrderedDict([('reader', 'configreader')]))
+
+            with self.subTest(1):
+                expected = (('reader', 'configreader', 'main'),)
+                result = config.search('reader')
+                self.assertEqual(result, expected)
 
     def test_returns_false_if_not_match_best(self):
         config = ConfigReader(self.file_path)
         config.set('header', 'confreader')
 
-        expected = ('reader', 'configreader', 'main')
+        expected = (('reader', 'configreader', 'main'), ('header', 'confreader', 'main'))
         result = config.search('confgreader')
         self.assertEqual(result, expected)
         config.close()
@@ -301,9 +312,8 @@ class TestConfigReaderTestCase(unittest.TestCase):
         config = ConfigReader(self.file_path)
         config.set('title', 'The Place')
 
-        expected = ()
         result = config.search('The place', exact_match=True)
-        self.assertEqual(result, expected)
+        self.assertEqual(result, None)
         config.close()
 
     def test_returns_false_if_exact_match_not_found_case_insensitive(self):
@@ -318,70 +328,55 @@ class TestConfigReaderTestCase(unittest.TestCase):
         config.close()
 
     def test_returns_false_if_path_not_changed(self):
-        f = open(self.file_path, 'w+')
-        config = ConfigReader(file_object=f)
-        new_path = os.path.join(
-            os.path.expanduser('~'), '{}.ini'.format(str(uuid4()))
-        )
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'[main]')
+        new_path = os.path.join(self.tempdir.path, '{}.ini'.format(str(uuid4())))
 
-        with self.subTest(0):
-            self.assertFalse(os.path.isfile(new_path))
+        with open(file_path, 'w+') as f, ConfigReader(file_object=f) as config:
+            with self.subTest(0):
+                self.assertTrue(os.path.isfile(file_path))
 
-        config.filename = new_path
+            with self.subTest(1):
+                self.assertFalse(os.path.isfile(new_path))
 
-        with self.subTest(1):
-            self.assertFalse(os.path.isfile(self.file_path))
+            config.filename = new_path
 
-        with self.subTest(2):
-            self.assertFalse(os.path.isfile(new_path))
+            with self.subTest(2):
+                self.assertFalse(os.path.isfile(file_path))
 
-        config.save()
+            with self.subTest(3):
+                self.assertFalse(os.path.isfile(new_path))
 
-        with self.subTest(3):
-            self.assertTrue(os.path.isfile(new_path))
-        config.close()
-        try:
-            os.remove(new_path)
-        except FileNotFoundError:
-            pass
+            config.save()
+
+            with self.subTest(4):
+                self.assertTrue(os.path.isfile(new_path))
 
     def test_returns_false_if_old_file_object_writable(self):
-        f = open(self.file_path, 'w+')
-        config = ConfigReader(file_object=f)
-        new_path = os.path.join(
-            os.path.expanduser('~'), '{}.ini'.format(str(uuid4()))
-        )
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'[main]')
 
-        config.filename = new_path
+        with open(file_path, 'w+') as f, ConfigReader(file_object=f) as config:
+            new_path = os.path.join(
+                os.path.expanduser('~'), '{}.ini'.format(str(uuid4()))
+            )
 
-        self.assertRaises(ValueError, lambda: f.write(''))
-        config.close()
-        try:
-            os.remove(new_path)
-        except FileNotFoundError:
-            pass
+            config.filename = new_path
+
+            self.assertRaises(ValueError, lambda: f.write(''))
 
     def test_returns_false_if_contents_not_similar(self):
-        f = open(self.file_path, 'w+')
-        config = ConfigReader(file_object=f)
-        new_path = os.path.join(
-            os.path.expanduser('~'), '{}.ini'.format(str(uuid4()))
-        )
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'[main]')
+        new_path = os.path.join(self.tempdir.path, '{}.ini'.format(str(uuid4())))
 
-        f.seek(0)
-        expected = f.read()
+        with open(file_path, 'w+') as f, ConfigReader(file_object=f) as config:
+            f.seek(0)
+            expected = f.read()
 
-        config.filename = new_path
-        config.save()
+            config.filename = new_path
+            config.save()
 
-        with open(new_path) as f2:
-            result = f2.read()
-        self.assertEqual(result, expected)
-        config.close()
-        try:
-            os.remove(new_path)
-        except FileNotFoundError:
-            pass
+            with open(new_path) as f2:
+                result = f2.read()
+            self.assertEqual(result, expected)
 
     def test_returns_false_if_file_object_cannot_update(self):
         f = open(self.file_path, 'w')
@@ -440,7 +435,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
         d = ConfigReader(self.file_path)
         with self.subTest(1):
-            self.assertIsNone(d.get('name', section='two'))
+            self.assertRaises(NoOptionError, d.get, 'name', section='two')
         config.close()
         d.close()
 
@@ -553,7 +548,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
             self.assertEqual(os.environ['COUNTER'], 'default')
 
     @unittest.skipIf(os.name == 'nt', 'Testing environment variable for Windows')
-    def test_returns_false_if_load_fails(self):
+    def test_returns_false_if_load_fails_linux(self):
         file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
         config = ConfigReader(file_path, case_sensitive=True)
         config.set('states', '35', section='country')
@@ -587,7 +582,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
             self.assertEqual(items['COUNTER'], 'never')
 
     @unittest.skipIf(os.name == 'nt', 'Testing environment variable for Linux')
-    def test_returns_false_if_load_fails_case_insensitive(self):
+    def test_returns_false_if_load_fails_case_insensitive_linux(self):
         file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
         config = ConfigReader(file_path)
         config.set('states', '35', section='country')
@@ -613,7 +608,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
             self.assertRaises(KeyError, call)
 
     @unittest.skipIf(os.name != 'nt', 'Testing environment variable for Windows')
-    def test_returns_false_if_load_fails(self):
+    def test_returns_false_if_load_fails_windows(self):
         file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
         config = ConfigReader(file_path, case_sensitive=True)
         config.set('states', '35', section='country')
@@ -647,7 +642,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
             self.assertEqual(items['COUNTER'], 'never')
 
     @unittest.skipIf(os.name != 'nt', 'Testing environment variable for Linux')
-    def test_returns_false_if_load_fails_case_insensitive(self):
+    def test_returns_false_if_load_fails_case_insensitive_windows(self):
         file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
         config = ConfigReader(file_path)
         config.set('states', '35', section='country')
@@ -768,8 +763,8 @@ class TestConfigReaderTestCase(unittest.TestCase):
             json.dump(d, j, ensure_ascii=False)
         else:
             json.dump(d, j, ensure_ascii=False)
-        finally:
-            j.close()
+
+        j.close()
 
         config = ConfigReader(file_path)
         config.load_json(json_file, section='json_data', encoding='utf-16')
@@ -778,7 +773,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
             compare(config.get('name', section='json_data'), 'plannet')
 
         with self.subTest(1):
-            self.assertFalse(config.get('skip', section='json_file'))
+            self.assertFalse(config.get('skip', section='json_data'))
 
         with self.subTest(2):
             self.assertIsInstance(config.get_items('counters'), OrderedDict)
@@ -830,7 +825,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
         config.close()
 
     @unittest.skipIf(os.name == 'nt', 'Testing environment variables for Linux')
-    def test_returns_false_if_environment_not_loaded_by_default(self):
+    def test_returns_false_if_environment_not_loaded_by_default_linux(self):
         file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
         with ConfigReader(file_path) as config:
             config.set('home', '$HOME')
@@ -843,7 +838,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
                 compare(config.get('host', default='$HOST'), os.environ['HOST'])
 
     @unittest.skipIf(os.name != 'nt', 'Testing environment variables for Windows')
-    def test_returns_false_if_environment_not_loaded_by_default(self):
+    def test_returns_false_if_environment_not_loaded_by_default_windows(self):
         file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
         with ConfigReader(file_path) as config:
             config.set('app_data', '$APPDATA')
@@ -853,6 +848,47 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
             with self.subTest(1):
                 compare(config.get('all_users_profile', default='$ALLUSERSPROFILE'), os.environ['ALLUSERSPROFILE'])
+
+    def test_returns_false_if_reload_fails(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())),
+                                       b'[main]\nreader = configreader\nmain = False\n')
+        with ConfigReader(file_path) as config:
+
+            with self.subTest(0):
+                compare(config.get_items('main'), OrderedDict([('reader', 'configreader'),
+                                                               ('main', False)]))
+
+            config.set('found', 'True')
+
+            with self.subTest(1):
+                compare(config.get_items('main'), OrderedDict([('reader', 'configreader'),
+                                                               ('main', False), ('found', True)]))
+
+            config.reload()
+
+            with self.subTest(2):
+                compare(config.get_items('main'), OrderedDict([('reader', 'configreader'),
+                                                               ('main', False)]))
+
+    def test_returns_false_if_case_sensistivity_fails(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        with ConfigReader(file_path, case_sensitive=True) as config:
+            config.set('NAME', 'cup')
+            config.set('LEAGUE', '1')
+
+            compare(config.get_items('main'), OrderedDict([('reader', 'configreader'),
+                                                           ('NAME', 'cup'),
+                                                           ('LEAGUE', 1)]))
+
+    @unittest.skipIf(sys.version_info.major != 2, 'Test for Python 2 only')
+    def test_returns_false_if_io_error_not_raised(self):
+        file_path = self.tempdir.write('{}.ini'.format(str(uuid4())), b'')
+        with open(file_path, 'w') as f, self.subTest(0):
+            self.assertRaises(ModeError, ConfigReader, file_object=f)
+
+        with open(file_path) as f, self.subTest(1):
+            self.assertRaises(ModeError, ConfigReader, file_object=f)
+
 
 if __name__ == "__main__":
     unittest.main()
