@@ -235,6 +235,8 @@ class ConfigReader(object):
     def reload(self):
         """Reload the configuration file into memory"""
         self.__defaults = DEFAULT_DICT
+        for i in self.sections:
+            self.remove_section(i)
         self._create_config()
 
     def _create_config(self):
@@ -272,7 +274,7 @@ class ConfigReader(object):
         except (ValueError, SyntaxError):
             # ValueError when normal string
             # SyntaxError when empty
-            result = str(value)
+            result = os.path.expandvars(str(value))
 
         return result
 
@@ -300,6 +302,14 @@ class ConfigReader(object):
         If ``evaluate`` is True, the returned values are evaluated to
         Python data types int, float and boolean.
 
+        .. versionchanged:: 0.5.0
+
+            Expands shell variables while leaving unknown ones unchanged.
+
+        .. versionchanged:: 0.4.0
+
+            Raises NoOptionError when a non-existent key is fetched.
+
         :param key: The key name
         :param section: The name of the section, defaults to **main**
         :param evaluate: Determines whether to evaluate the acquired values into Python literals
@@ -310,6 +320,7 @@ class ConfigReader(object):
         :type evaluate: bool
         :type default: str
         :type default_commit: bool
+        :raises NoOptionError: When the key whose value is being fetched does not exist in the section
         :returns: The value that is mapped to the key or None if not found
         :rtype: Union[str, int, float, bool, None]
         """
@@ -317,10 +328,13 @@ class ConfigReader(object):
         value = 'None'
         try:
             value = self.__parser.get(section, option=key)
+
         except (NoSectionError, NoOptionError):
             if default is not None:
                 value = default
                 self.set(key, default, section, commit=default_commit)
+            else:
+                raise NoOptionError(key, section)
 
         if evaluate:
             value = self._evaluate(value)
@@ -473,6 +487,10 @@ class ConfigReader(object):
         The ``threshold`` value should be 0, 1 or any value
         between 0 and 1. The higher the value the better the accuracy.
 
+        .. versionchanged:: 0.5.0
+
+            Returns all the matches found
+
         :param value: The value to search for in the config file
         :param case_sensitive: Match case during search or not
         :param exact_match: Match exact value
@@ -481,8 +499,8 @@ class ConfigReader(object):
         :type case_sensitive: bool
         :type exact_match: bool
         :type threshold: float
-        :returns: A tuple of the key, value and section
-        :rtype: tuple
+        :returns: A tuple of the key, value and section of the results, else None
+        :rtype: Union[tuple, None]
         """
         if not 0 <= threshold <= 1:
             raise ThresholdError(
@@ -509,10 +527,10 @@ class ConfigReader(object):
                         result = (ratio, key, found, section)
                         matches.append(result)
         if matches:
-            best_match = sorted(matches, reverse=True)[0]
-            return tuple(best_match[1:])
+            best_match = sorted(matches, reverse=True)
+            return tuple(i[1:] for i in best_match)
         else:
-            return ()
+            return None
 
     def to_json(self, file_object=None):
         """Export config to JSON

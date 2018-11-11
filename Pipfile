@@ -16,6 +16,7 @@ watchdog = "*"
 u-msgpack-python = "*"
 sphinx-rtd-theme = "*"
 sphinx = "*"
+bumpversion = "*"
 
 [requires]
 python_version = "3.6"
