@@ -17,6 +17,7 @@ u-msgpack-python = "*"
 sphinx-rtd-theme = "*"
 sphinx = "*"
 bumpversion = "*"
+twine = "*"
 
 [requires]
 python_version = "3.6"

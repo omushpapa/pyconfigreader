@@ -835,7 +835,7 @@ class TestConfigReaderTestCase(unittest.TestCase):
                 compare(config.get('home'), os.environ['HOME'])
 
             with self.subTest(1):
-                compare(config.get('host', default='$HOST'), os.environ['HOST'])
+                compare(config.get('shell', default='$SHELL'), os.environ['SHELL'])
 
     @unittest.skipIf(os.name != 'nt', 'Testing environment variables for Windows')
     def test_returns_false_if_environment_not_loaded_by_default_windows(self):
