@@ -31,7 +31,7 @@ and paste the following content::
    groups = 1000
 
 
-In a Python console, import :class:`~reader.ConfigReader`::
+In a Python console, import :class:`~pyconfigreader.reader.ConfigReader`::
    
    >>> from pyconfigreader import ConfigReader
 
@@ -59,7 +59,7 @@ Save changes::
 
    >>> config.save()
 
-Close the :class:`~reader.ConfigReader` object::
+Close the :class:`~pyconfigreader.reader.ConfigReader` object::
 
    >>> config.close()  # Close without saving changes
    >>> # or

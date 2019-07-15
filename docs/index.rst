@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-PyConfigReader Documentation
+pyconfigreader Documentation
 ============================
 
 A configuration file handler for the most basic stuff in ini files that

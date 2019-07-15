@@ -10,6 +10,7 @@ pypandoc = "==1.4"
 coverage = "*"
 tox = "*"
 codacy-coverage = "*"
+faker = "*"
 
 [dev-packages]
 watchdog = "*"
@@ -18,6 +19,9 @@ sphinx-rtd-theme = "*"
 sphinx = "*"
 bumpversion = "*"
 twine = "*"
+line-profiler = "*"
+faker = "*"
+pympler = "*"
 
 [requires]
 python_version = "3.6"

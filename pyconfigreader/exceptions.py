@@ -19,3 +19,16 @@ try:
 except NameError:
     FileNotFoundError = OSError
 
+try:
+    from configparser import ConfigParser, NoOptionError
+except ImportError:
+    from ConfigParser import SafeConfigParser as ConfigParser, NoOptionError
+
+
+class MissingOptionError(NoOptionError):
+    """Raised when a key cannot be found
+
+    This could be because the key does not exist in the section or the section
+    does not exist at all
+    """
+

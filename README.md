@@ -1,12 +1,13 @@
-# ConfigReader
+# pyconfigreader
 
-[![Travis-CI](https://img.shields.io/travis/giantas/pyconfigreader.svg?maxAge=25920)](https://travis-ci.org/giantas/pyconfigreader)
+[![Travis-CI](https://img.shields.io/travis/giantas/pyconfigreader.svg?maxAge=220)](https://travis-ci.org/giantas/pyconfigreader)
 [![Codacy Badge](https://api.codacy.com/project/badge/Coverage/5f3132cafe78478dbdeb081b53d3661d)](https://www.codacy.com/app/giantas/pyconfigreader?utm_source=github.com&utm_medium=referral&utm_content=giantas/pyconfigreader&utm_campaign=Badge_Coverage)
 [![Issues](https://img.shields.io/github/issues-raw/giantas/pyconfigreader/website.svg)](https://github.com/giantas/pyconfigreader/issues)
+[![Python](https://img.shields.io/pypi/pyversions/pyconfigreader.svg)](https://img.shields.io/pypi/pyversions/pyconfigreader.svg)
 
 A configuration file handler for the most basic stuff in ini files that will get you up and running in no time.
 
-`ConfigReader` uses Python's ConfigParser to parse config files.
+pyconfigreader's `ConfigReader` uses Python's ConfigParser to parse config files.
 
 ***PS***: This is just to get you working on other stuff and not focus on config files. 
 If you need advanced features head to [Python's ConfigParser](https://docs.python.org/3/library/configparser.html) or 

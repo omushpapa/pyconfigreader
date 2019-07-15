@@ -7,8 +7,9 @@ import json
 import shutil
 from difflib import SequenceMatcher
 from pyconfigreader.exceptions import (ModeError, SectionNameNotAllowed,
-                                       ThresholdError, FileNotFoundError)
+                                       ThresholdError, FileNotFoundError, MissingOptionError)
 from collections import OrderedDict
+from copy import deepcopy
 
 try:
     from ConfigParser import (SafeConfigParser as ConfigParser, NoSectionError,
@@ -44,12 +45,7 @@ def load_defaults(filename, case_sensitive=CASE_SENSITIVE):
     parser.read(filename)
 
     for section in parser.sections():
-        configs[section] = OrderedDict()
-        options = parser.options(section)
-
-        for option in options:
-            value = parser.get(section, option)
-            configs[section][option] = value
+        configs[section] = OrderedDict(parser.items(section))
     return configs
 
 
@@ -60,7 +56,7 @@ class ConfigReader(object):
 
     It is preferred that the value of ``filename`` be an absolute path.
     If ``filename`` is not an absolute path, then the configuration (ini) file
-    will be saved at the Current Working directory (the value of ``os.getcwd()``).
+    will be saved at the Current Working directory (the value of :func:`~os.getcwd`).
 
     If ``file_object`` is an open file then ``filename`` shall point to it's path
 
@@ -89,7 +85,7 @@ class ConfigReader(object):
     :ivar OrderedDict sections: The sections in the ini file
     """
 
-    __defaults = DEFAULT_DICT
+    __defaults = deepcopy(DEFAULT_DICT)
     __default_section = 'main'
 
     def __init__(self, filename='settings.ini', file_object=None,
@@ -110,7 +106,7 @@ class ConfigReader(object):
 
     @property
     def sections(self):
-        return [str(i) for i in self.__parser.sections()]
+        return self._get_sections()
 
     @sections.setter
     def sections(self, value):
@@ -118,7 +114,7 @@ class ConfigReader(object):
 
     @property
     def filename(self):
-        return self.__filename
+        return self._get_filename()
 
     @filename.setter
     def filename(self, value):
@@ -130,11 +126,17 @@ class ConfigReader(object):
         except AttributeError:
             pass
 
+    def _get_sections(self):
+        return self.__parser.sections()
+
+    def _get_filename(self):
+        return self.__filename
+
     def _get_new_object(self):
         """Copies the contents of the old file into a buffer
         and deletes the old file.
 
-        To write to disk call :func:`~reader.ConfigReader.save`
+        To write to disk call :func:`~pyconfigreader.reader.ConfigReader.save`
         """
         new_io = IO()
         new_io.truncate(0)
@@ -234,7 +236,7 @@ class ConfigReader(object):
 
     def reload(self):
         """Reload the configuration file into memory"""
-        self.__defaults = DEFAULT_DICT
+        self.__defaults = deepcopy(DEFAULT_DICT)
         for i in self.sections:
             self.remove_section(i)
         self._create_config()
@@ -249,21 +251,18 @@ class ConfigReader(object):
         :rtype: None
         """
         defaults = load_defaults(self.filename, self.case_sensitive)
-        self.__defaults.update(defaults)
+        data = deepcopy(self.__defaults)
+        data.update(defaults)
 
-        for key in self.__defaults.keys():
-            value = self.__defaults[key]
+        for key, value in data.items():
             if isinstance(value, OrderedDict):
                 self._add_section(key)
+                self._set_many(value, section=key)
 
-                for item in value.keys():
-                    self.set(key=item,
-                             value=value[item],
-                             section=key)
             else:
                 section = self.__default_section
                 self._add_section(section)
-                self.set(key, value, section)
+                self._set(key, value, section)
 
         self._write_config()
 
@@ -310,6 +309,10 @@ class ConfigReader(object):
 
             Raises NoOptionError when a non-existent key is fetched.
 
+        .. versionchanged:: 0.7.0
+
+            Replaced NoOptionError with :exc:`~pyconfigreader.exceptions.MissingOptionError` for py2.7 compatibility.
+
         :param key: The key name
         :param section: The name of the section, defaults to **main**
         :param evaluate: Determines whether to evaluate the acquired values into Python literals
@@ -320,21 +323,20 @@ class ConfigReader(object):
         :type evaluate: bool
         :type default: str
         :type default_commit: bool
-        :raises NoOptionError: When the key whose value is being fetched does not exist in the section
+        :raises MissingOptionError: When the key whose value is being fetched does not exist in the section
         :returns: The value that is mapped to the key or None if not found
         :rtype: Union[str, int, float, bool, None]
         """
         section = section or self.__default_section
-        value = 'None'
         try:
             value = self.__parser.get(section, option=key)
 
         except (NoSectionError, NoOptionError):
-            if default is not None:
-                value = default
-                self.set(key, default, section, commit=default_commit)
-            else:
-                raise NoOptionError(key, section)
+            if default is None:
+                raise MissingOptionError(key, section)
+
+            value = default
+            self.set(key, default, section, commit=default_commit)
 
         if evaluate:
             value = self._evaluate(value)
@@ -360,17 +362,47 @@ class ConfigReader(object):
         :type commit: bool
         :rtype: None
         """
-        section = section or self.__default_section
-        self._add_section(section)
+        _section = self._get_valid_section(section)
+        self._set(key, value, _section)
+        self._propagate_changes(commit)
+
+    def _propagate_changes(self, commit):
+        self._write_config()
+        if commit:
+            self.save()
+
+    def _get_valid_section(self, section):
+        _section = section or self.__default_section
+        self._add_section(_section)
+        return _section
+
+    def _set(self, key, value, section=None):
         try:
             self.__parser.set(section, option=key, value=str(value))
         except ValueError:
             # String interpolation error
             value = value.replace('%', '%%').replace('%%(', '%(')
             self.__parser.set(section, option=key, value=value)
-        self._write_config()
-        if commit:
-            self.save()
+
+    def _set_many(self, data, section):
+        for _key, _value in data.items():
+            self._set(key=_key, value=_value, section=section)
+
+    def set_many(self, data, section=None, commit=False):
+        """Update multiple keys
+
+        This is a convenience method that is much faster to utilise than using
+        :func:`~pyconfigreader.reader.ConfigReader.set` for every key.
+
+        .. versionadded:: 0.6.0
+
+        :param dict data: Data to update in the configuration file
+        :param str section: The section to update with the data
+        :param bool commit: If True, write, instantly, all change to file. Defaults to False.
+        """
+        _section = self._get_valid_section(section)
+        self._set_many(data, _section)
+        self._propagate_changes(commit)
 
     def get_items(self, section):
         """Returns an OrderedDict of items (keys and their values) from a section
@@ -389,9 +421,8 @@ class ConfigReader(object):
             return None
 
         d = OrderedDict()
-        for i in self.__parser.items(section):
-            key = str(i[0])
-            value = self._evaluate(i[1])
+        for key, v in self.__parser.items(section):
+            value = self._evaluate(v)
             d[key] = value
         return d
 
@@ -438,7 +469,7 @@ class ConfigReader(object):
             self.save()
 
     def remove_key(self, *args, **kwargs):
-        """Same as calling :func:`~reader.ConfigReader.remove_option`
+        """Same as calling :func:`~pyconfigreader.reader.ConfigReader.remove_option`
 
         This is just in case one is used to the key-value term pair
         """
@@ -633,7 +664,7 @@ class ConfigReader(object):
     def to_env(self, environment=None, prepend=True):
         """Export contents to an environment
 
-        Exports by default to ``os.environ()``.
+        Exports by default to :data:`os.environ`.
 
         By default, the section and option would be capitalised
         and joined by an underscore to form the key - as an
@@ -655,7 +686,7 @@ class ConfigReader(object):
 
         :param environment: An environment to export to
         :param prepend: Prepend the section name to the key
-        :type environment: os.environ
+        :type environment: :data:`os.environ`
         :type prepend: bool
         :returns: Nothing
         :rtype: None
@@ -668,8 +699,7 @@ class ConfigReader(object):
 
             for item in items:
                 if prepend:
-                    env_key = '{}_{}'.format(
-                        section.upper(), item.upper())
+                    env_key = '{}_{}'.format(section, item).upper()
                 else:
                     env_key = item.upper()
 
@@ -681,7 +711,7 @@ class ConfigReader(object):
         Write the contents to a file on the disk.
 
         This does not close the file. You have to explicitly call
-        :func:`~reader.ConfigReader.close` to do so.
+        :func:`~pyconfigreader.reader.ConfigReader.close` to do so.
 
         :returns: Nothing
         :rtype: None
@@ -714,10 +744,10 @@ class ConfigReader(object):
     def load_env(self, environment=None, prefix='', commit=False):
         """Load alphanumeric environment variables into configuration file
 
-        Default environment is provided by ``os.environ()``.
+        Default environment is provided by :data:`os.environ`.
 
         The ``prefix`` is used to filter keys in the environment which
-        start with the value. This is an adaptive mode to :func:`~reader.ConfigReader.to_env`
+        start with the value. This is an adaptive mode to :func:`~pyconfigreader.reader.ConfigReader.to_env`
         which prepends the section to the key before loading it to the
         environment.
 
@@ -734,13 +764,10 @@ class ConfigReader(object):
         pref = prefix.upper()
 
         if pref:
-            items = ((self._separate_prefix(k, pref), v)
+            items = {self._separate_prefix(k, pref): v
                      for k, v in env.items()
-                     if k.startswith(pref))
-
-            for key, value in items:
-                self.set(key, value, section=prefix, commit=commit)
+                     if k.startswith(pref)}
+            self.set_many(items, section=prefix, commit=commit)
 
         else:
-            for key, value in env.items():
-                self.set(key, value, commit=commit)
+            self.set_many(env, commit=commit)
