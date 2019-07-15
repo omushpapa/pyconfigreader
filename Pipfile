@@ -10,6 +10,7 @@ pypandoc = "==1.4"
 coverage = "*"
 tox = "*"
 codacy-coverage = "*"
+faker = "*"
 
 [dev-packages]
 watchdog = "*"
