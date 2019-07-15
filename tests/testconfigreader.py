@@ -8,8 +8,7 @@ import codecs
 import unittest2 as unittest
 from pyconfigreader import ConfigReader
 from pyconfigreader.exceptions import (ThresholdError, SectionNameNotAllowed,
-                                       ModeError, FileNotFoundError)
-from uuid import uuid4
+                                       ModeError, FileNotFoundError, MissingOptionError)
 from testfixtures import TempDirectory, compare
 from collections import OrderedDict
 from faker import Faker
@@ -150,11 +149,8 @@ class TestConfigReaderTestCase(unittest.TestCase):
         config.set('Sample', 'Example', 'OtherSection')
         config.remove_option('Sample', 'MainSection')
 
-        with self.subTest(0):
-            def raises_error():
-                config.get('Sample', section='MainSection')
-
-            self.assertRaises(NoOptionError, raises_error)
+        with self.subTest(0), self.assertRaises(MissingOptionError):
+            config.get('Sample', section='MainSection')
 
         with self.subTest(1):
             expected = ['MainSection', 'main', 'OtherSection']
@@ -260,11 +256,8 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(1):
             self.assertEqual(config.get('empty'), '')
 
-        with self.subTest(2):
-            def raises_error():
-                config.get('count')
-
-            self.assertRaises(NoOptionError, raises_error)
+        with self.subTest(2), self.assertRaises(MissingOptionError):
+            config.get('count')
 
         with self.subTest(3):
             self.assertEqual(
@@ -447,7 +440,8 @@ class TestConfigReaderTestCase(unittest.TestCase):
         config.set('name', 'first')
 
         with ConfigReader(file_path) as d, self.subTest(0):
-            self.assertRaises(NoOptionError, d.get, 'name')
+            with self.assertRaises(MissingOptionError):
+                d.get('name')
 
         config.set('name', 'last', commit=True)
         config.close()
@@ -466,8 +460,8 @@ class TestConfigReaderTestCase(unittest.TestCase):
 
         config.remove_key('name', section='two', commit=True)
 
-        with ConfigReader(self.file_path) as d, self.subTest(1):
-            self.assertRaises(NoOptionError, d.get, 'name', section='two')
+        with ConfigReader(self.file_path) as d, self.subTest(1), self.assertRaises(MissingOptionError):
+            d.get('name', section='two')
         config.close()
 
     def test_returns_false_if_file_object_not_closed(self):
@@ -815,10 +809,8 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with self.subTest(0):
             compare(config.get('path', 'test'), 'drive')
 
-        with self.subTest(1):
-            def get_unset_value():
-                config.get('busy', section='test')
-            self.assertRaises(NoOptionError, get_unset_value)
+        with self.subTest(1), self.assertRaises(MissingOptionError):
+            config.get('busy', section='test')
 
         config.close()
 
@@ -909,8 +901,8 @@ class TestConfigReaderTestCase(unittest.TestCase):
                                  ['one', 2])
 
         config.reload()
-        with self.subTest():
-            self.assertRaises(NoOptionError, config.get, 'number')
+        with self.subTest(), self.assertRaises(MissingOptionError):
+            config.get('number')
 
         data = OrderedDict([('people', 'true'), ('count', 30)])
         config.set_many(data, section='demo')

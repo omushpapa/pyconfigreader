@@ -1,4 +1,4 @@
-The PyConfigReader API Reference
+The pyconfigreader API Reference
 ================================
 
 ConfigReader

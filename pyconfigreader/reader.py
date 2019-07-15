@@ -7,7 +7,7 @@ import json
 import shutil
 from difflib import SequenceMatcher
 from pyconfigreader.exceptions import (ModeError, SectionNameNotAllowed,
-                                       ThresholdError, FileNotFoundError)
+                                       ThresholdError, FileNotFoundError, MissingOptionError)
 from collections import OrderedDict
 from copy import deepcopy
 
@@ -56,7 +56,7 @@ class ConfigReader(object):
 
     It is preferred that the value of ``filename`` be an absolute path.
     If ``filename`` is not an absolute path, then the configuration (ini) file
-    will be saved at the Current Working directory (the value of ``os.getcwd()``).
+    will be saved at the Current Working directory (the value of :func:`~os.getcwd`).
 
     If ``file_object`` is an open file then ``filename`` shall point to it's path
 
@@ -136,7 +136,7 @@ class ConfigReader(object):
         """Copies the contents of the old file into a buffer
         and deletes the old file.
 
-        To write to disk call :func:`~reader.ConfigReader.save`
+        To write to disk call :func:`~pyconfigreader.reader.ConfigReader.save`
         """
         new_io = IO()
         new_io.truncate(0)
@@ -309,6 +309,10 @@ class ConfigReader(object):
 
             Raises NoOptionError when a non-existent key is fetched.
 
+        .. versionchanged:: 0.7.0
+
+            Replaced NoOptionError with :exc:`~pyconfigreader.exceptions.MissingOptionError` for py2.7 compatibility.
+
         :param key: The key name
         :param section: The name of the section, defaults to **main**
         :param evaluate: Determines whether to evaluate the acquired values into Python literals
@@ -319,21 +323,20 @@ class ConfigReader(object):
         :type evaluate: bool
         :type default: str
         :type default_commit: bool
-        :raises NoOptionError: When the key whose value is being fetched does not exist in the section
+        :raises MissingOptionError: When the key whose value is being fetched does not exist in the section
         :returns: The value that is mapped to the key or None if not found
         :rtype: Union[str, int, float, bool, None]
         """
         section = section or self.__default_section
-        value = 'None'
         try:
             value = self.__parser.get(section, option=key)
 
         except (NoSectionError, NoOptionError):
-            if default is not None:
-                value = default
-                self.set(key, default, section, commit=default_commit)
-            else:
-                raise NoOptionError(key, section)
+            if default is None:
+                raise MissingOptionError(key, section)
+
+            value = default
+            self.set(key, default, section, commit=default_commit)
 
         if evaluate:
             value = self._evaluate(value)
@@ -389,7 +392,7 @@ class ConfigReader(object):
         """Update multiple keys
 
         This is a convenience method that is much faster to utilise than using
-        :func:`~reader.ConfigReader.set` for every key.
+        :func:`~pyconfigreader.reader.ConfigReader.set` for every key.
 
         .. versionadded:: 0.6.0
 
@@ -466,7 +469,7 @@ class ConfigReader(object):
             self.save()
 
     def remove_key(self, *args, **kwargs):
-        """Same as calling :func:`~reader.ConfigReader.remove_option`
+        """Same as calling :func:`~pyconfigreader.reader.ConfigReader.remove_option`
 
         This is just in case one is used to the key-value term pair
         """
@@ -661,7 +664,7 @@ class ConfigReader(object):
     def to_env(self, environment=None, prepend=True):
         """Export contents to an environment
 
-        Exports by default to ``os.environ()``.
+        Exports by default to :data:`os.environ`.
 
         By default, the section and option would be capitalised
         and joined by an underscore to form the key - as an
@@ -683,7 +686,7 @@ class ConfigReader(object):
 
         :param environment: An environment to export to
         :param prepend: Prepend the section name to the key
-        :type environment: os.environ
+        :type environment: :data:`os.environ`
         :type prepend: bool
         :returns: Nothing
         :rtype: None
@@ -696,8 +699,7 @@ class ConfigReader(object):
 
             for item in items:
                 if prepend:
-                    env_key = '{}_{}'.format(
-                        section.upper(), item.upper())
+                    env_key = '{}_{}'.format(section, item).upper()
                 else:
                     env_key = item.upper()
 
@@ -709,7 +711,7 @@ class ConfigReader(object):
         Write the contents to a file on the disk.
 
         This does not close the file. You have to explicitly call
-        :func:`~reader.ConfigReader.close` to do so.
+        :func:`~pyconfigreader.reader.ConfigReader.close` to do so.
 
         :returns: Nothing
         :rtype: None
@@ -742,10 +744,10 @@ class ConfigReader(object):
     def load_env(self, environment=None, prefix='', commit=False):
         """Load alphanumeric environment variables into configuration file
 
-        Default environment is provided by ``os.environ()``.
+        Default environment is provided by :data:`os.environ`.
 
         The ``prefix`` is used to filter keys in the environment which
-        start with the value. This is an adaptive mode to :func:`~reader.ConfigReader.to_env`
+        start with the value. This is an adaptive mode to :func:`~pyconfigreader.reader.ConfigReader.to_env`
         which prepends the section to the key before loading it to the
         environment.
 
