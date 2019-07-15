@@ -9,6 +9,7 @@ from difflib import SequenceMatcher
 from pyconfigreader.exceptions import (ModeError, SectionNameNotAllowed,
                                        ThresholdError, FileNotFoundError)
 from collections import OrderedDict
+from copy import deepcopy
 
 try:
     from ConfigParser import (SafeConfigParser as ConfigParser, NoSectionError,
@@ -44,12 +45,7 @@ def load_defaults(filename, case_sensitive=CASE_SENSITIVE):
     parser.read(filename)
 
     for section in parser.sections():
-        configs[section] = OrderedDict()
-        options = parser.options(section)
-
-        for option in options:
-            value = parser.get(section, option)
-            configs[section][option] = value
+        configs[section] = OrderedDict(parser.items(section))
     return configs
 
 
@@ -89,7 +85,7 @@ class ConfigReader(object):
     :ivar OrderedDict sections: The sections in the ini file
     """
 
-    __defaults = DEFAULT_DICT
+    __defaults = deepcopy(DEFAULT_DICT)
     __default_section = 'main'
 
     def __init__(self, filename='settings.ini', file_object=None,
@@ -110,7 +106,7 @@ class ConfigReader(object):
 
     @property
     def sections(self):
-        return [str(i) for i in self.__parser.sections()]
+        return self._get_sections()
 
     @sections.setter
     def sections(self, value):
@@ -118,7 +114,7 @@ class ConfigReader(object):
 
     @property
     def filename(self):
-        return self.__filename
+        return self._get_filename()
 
     @filename.setter
     def filename(self, value):
@@ -129,6 +125,12 @@ class ConfigReader(object):
             self.__filename = self.__file_object.name
         except AttributeError:
             pass
+
+    def _get_sections(self):
+        return self.__parser.sections()
+
+    def _get_filename(self):
+        return self.__filename
 
     def _get_new_object(self):
         """Copies the contents of the old file into a buffer
@@ -234,7 +236,7 @@ class ConfigReader(object):
 
     def reload(self):
         """Reload the configuration file into memory"""
-        self.__defaults = DEFAULT_DICT
+        self.__defaults = deepcopy(DEFAULT_DICT)
         for i in self.sections:
             self.remove_section(i)
         self._create_config()
@@ -249,21 +251,18 @@ class ConfigReader(object):
         :rtype: None
         """
         defaults = load_defaults(self.filename, self.case_sensitive)
-        self.__defaults.update(defaults)
+        data = deepcopy(self.__defaults)
+        data.update(defaults)
 
-        for key in self.__defaults.keys():
-            value = self.__defaults[key]
+        for key, value in data.items():
             if isinstance(value, OrderedDict):
                 self._add_section(key)
+                self._set_many(value, section=key)
 
-                for item in value.keys():
-                    self.set(key=item,
-                             value=value[item],
-                             section=key)
             else:
                 section = self.__default_section
                 self._add_section(section)
-                self.set(key, value, section)
+                self._set(key, value, section)
 
         self._write_config()
 
@@ -360,17 +359,47 @@ class ConfigReader(object):
         :type commit: bool
         :rtype: None
         """
-        section = section or self.__default_section
-        self._add_section(section)
+        _section = self._get_valid_section(section)
+        self._set(key, value, _section)
+        self._propagate_changes(commit)
+
+    def _propagate_changes(self, commit):
+        self._write_config()
+        if commit:
+            self.save()
+
+    def _get_valid_section(self, section):
+        _section = section or self.__default_section
+        self._add_section(_section)
+        return _section
+
+    def _set(self, key, value, section=None):
         try:
             self.__parser.set(section, option=key, value=str(value))
         except ValueError:
             # String interpolation error
             value = value.replace('%', '%%').replace('%%(', '%(')
             self.__parser.set(section, option=key, value=value)
-        self._write_config()
-        if commit:
-            self.save()
+
+    def _set_many(self, data, section):
+        for _key, _value in data.items():
+            self._set(key=_key, value=_value, section=section)
+
+    def set_many(self, data, section=None, commit=False):
+        """Update multiple keys
+
+        This is a convenience method that is much faster to utilise than using
+        :func:`~reader.ConfigReader.set` for every key.
+
+        .. versionadded:: 0.6.0
+
+        :param dict data: Data to update in the configuration file
+        :param str section: The section to update with the data
+        :param bool commit: If True, write, instantly, all change to file. Defaults to False.
+        """
+        _section = self._get_valid_section(section)
+        self._set_many(data, _section)
+        self._propagate_changes(commit)
 
     def get_items(self, section):
         """Returns an OrderedDict of items (keys and their values) from a section
@@ -389,9 +418,8 @@ class ConfigReader(object):
             return None
 
         d = OrderedDict()
-        for i in self.__parser.items(section):
-            key = str(i[0])
-            value = self._evaluate(i[1])
+        for key, v in self.__parser.items(section):
+            value = self._evaluate(v)
             d[key] = value
         return d
 
@@ -734,13 +762,10 @@ class ConfigReader(object):
         pref = prefix.upper()
 
         if pref:
-            items = ((self._separate_prefix(k, pref), v)
+            items = {self._separate_prefix(k, pref): v
                      for k, v in env.items()
-                     if k.startswith(pref))
-
-            for key, value in items:
-                self.set(key, value, section=prefix, commit=commit)
+                     if k.startswith(pref)}
+            self.set_many(items, section=prefix, commit=commit)
 
         else:
-            for key, value in env.items():
-                self.set(key, value, commit=commit)
+            self.set_many(env, commit=commit)

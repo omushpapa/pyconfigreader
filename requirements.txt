@@ -35,3 +35,4 @@ unittest2==1.1.0
 urllib3==1.23
 virtualenv==16.0.0
 watchdog==0.8.3
+Faker==1.0.7

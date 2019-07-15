@@ -18,6 +18,9 @@ sphinx-rtd-theme = "*"
 sphinx = "*"
 bumpversion = "*"
 twine = "*"
+line-profiler = "*"
+faker = "*"
+pympler = "*"
 
 [requires]
 python_version = "3.6"
