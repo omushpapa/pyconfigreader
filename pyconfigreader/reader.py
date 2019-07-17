@@ -642,9 +642,8 @@ class ConfigReader(object):
         else:
             contents = f.read()
 
-        finally:
-            f.close()
-            data = json.loads(contents)
+        f.close()
+        data = json.loads(contents)
 
         for key in data.keys():
             value = data[key]
@@ -728,10 +727,6 @@ class ConfigReader(object):
         """Close the file-like object
 
         If ``save`` is True, the contents are written to the file on disk first .
-
-        .. CAUTION::
-           Not closing the object might have it update any other
-           instance created later on.
 
         :param save: write changes to disk
         :type save: bool
