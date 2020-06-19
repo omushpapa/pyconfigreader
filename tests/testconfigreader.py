@@ -1,29 +1,21 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import codecs
+import json
 import os
 import sys
-import json
-import codecs
-import unittest2 as unittest
-from pyconfigreader import ConfigReader
-from pyconfigreader.exceptions import (ThresholdError, SectionNameNotAllowed,
-                                       ModeError, FileNotFoundError, MissingOptionError)
-from testfixtures import TempDirectory, compare
 from collections import OrderedDict
+from io import StringIO
+
+import unittest2 as unittest
 from faker import Faker
 from faker.providers import BaseProvider
+from testfixtures import TempDirectory, compare
 
-try:
-    from configparser import ConfigParser, NoOptionError
-except ImportError:
-    from ConfigParser import SafeConfigParser as ConfigParser, NoOptionError
-
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
-
+from pyconfigreader import ConfigReader
+from pyconfigreader.exceptions import (ThresholdError, SectionNameNotAllowed,
+                                       ModeError, MissingOptionError)
 
 fake = Faker()
 

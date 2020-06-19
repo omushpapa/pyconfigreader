@@ -7,20 +7,14 @@ import json
 import shutil
 from difflib import SequenceMatcher
 from pyconfigreader.exceptions import (ModeError, SectionNameNotAllowed,
-                                       ThresholdError, FileNotFoundError, MissingOptionError)
+                                       ThresholdError, MissingOptionError)
 from collections import OrderedDict
 from copy import deepcopy
 
-try:
-    from ConfigParser import (SafeConfigParser as ConfigParser, NoSectionError,
-                              NoOptionError, DuplicateSectionError)
-except ImportError:
-    from configparser import (ConfigParser, NoSectionError,
-                              NoOptionError, DuplicateSectionError)
-try:
-    from StringIO import StringIO as IO
-except ImportError:
-    from io import StringIO as IO
+from configparser import (ConfigParser, NoSectionError,
+                          NoOptionError, DuplicateSectionError)
+
+from io import StringIO
 
 CASE_SENSITIVE = False
 ALLOW_NO_VALUE = True
@@ -138,16 +132,13 @@ class ConfigReader(object):
 
         To write to disk call :func:`~pyconfigreader.reader.ConfigReader.save`
         """
-        new_io = IO()
+        new_io = StringIO()
         new_io.truncate(0)
 
         self.__file_object.seek(0)
 
         content = self.__file_object.read()
-        try:
-            new_io.write(content)
-        except TypeError:
-            new_io.write(content.decode('utf-8'))
+        new_io.write(content)
 
         self.__file_object.close()
         os.remove(self.__file_object.name)
@@ -165,21 +156,10 @@ class ConfigReader(object):
         :rtype: Union[StringIO, TextIO]
         """
         if file_object is None:
-            file_object = IO()
-        if not isinstance(file_object, IO):
-            try:
-                mode = file_object.mode
-
-            except AttributeError:
-                try:
-                    file_object.read()
-
-                except IOError:
-                    raise ModeError("Open file not in mode 'w+'")
-
-            else:
-                if mode != 'w+':
-                    raise ModeError("Open file not in mode 'w+'")
+            file_object = StringIO()
+        if not isinstance(file_object, StringIO):
+            if file_object.mode != 'w+':
+                raise ModeError("Open file not in mode 'w+'")
 
             self.__filename = os.path.abspath(file_object.name)
 
@@ -436,10 +416,7 @@ class ConfigReader(object):
         :rtype: None
         """
         self.__file_object.seek(0)  # to avoid configparser.MissingSectionHeaderError
-        try:
-            self.__parser.read_file(self.__file_object, source=self.filename)
-        except AttributeError:
-            self.__parser.readfp(self.__file_object, filename=self.filename)
+        self.__parser.read_file(self.__file_object, source=self.filename)
         self.__parser.remove_section(section)
         self._write_config()
         self.__file_object.truncate()
@@ -458,10 +435,7 @@ class ConfigReader(object):
         """
         section = section or self.__default_section
         self.__file_object.seek(0)  # to avoid configparser.MissingSectionHeaderError
-        try:
-            self.__parser.read_file(self.__file_object, source=self.filename)
-        except AttributeError:
-            self.__parser.readfp(self.__file_object, filename=self.filename)
+        self.__parser.read_file(self.__file_object, source=self.filename)
         self.__parser.remove_option(section=section, option=key)
         self._write_config()
         self.__file_object.truncate()
@@ -629,20 +603,9 @@ class ConfigReader(object):
         :type encoding: str
         :return: nothing
         """
-        try:
-            f = open(filename, 'r', encoding=encoding)
-        except TypeError:
-            # Python 2
-            f = open(filename, 'rb')
-            if encoding is None:
-                contents = f.read()
-            else:
-                contents = f.read().decode(encoding)
-
-        else:
+        with open(filename, 'r', encoding=encoding) as f:
             contents = f.read()
 
-        f.close()
         data = json.loads(contents)
 
         for key in data.keys():
@@ -715,7 +678,7 @@ class ConfigReader(object):
         :returns: Nothing
         :rtype: None
         """
-        if isinstance(self.__file_object, IO):
+        if isinstance(self.__file_object, StringIO):
             with open(self.filename, 'w') as config_file:
                 self.__file_object.seek(0)
                 shutil.copyfileobj(self.__file_object, config_file)
