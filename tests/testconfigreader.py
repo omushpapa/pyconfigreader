@@ -874,15 +874,6 @@ class TestConfigReaderTestCase(unittest.TestCase):
                                                            ('NAME', 'cup'),
                                                            ('LEAGUE', 1)]))
 
-    @unittest.skipIf(sys.version_info.major != 2, 'Test for Python 2 only')
-    def test_returns_false_if_io_error_not_raised(self):
-        file_path = self.tempdir.write(fake.config_file(), b'')
-        with open(file_path, 'w') as f, self.subTest(0):
-            self.assertRaises(ModeError, ConfigReader, file_object=f)
-
-        with open(file_path) as f, self.subTest(1):
-            self.assertRaises(ModeError, ConfigReader, file_object=f)
-
     def test_returns_false_if_set_many_fails(self):
         file_path = self._get_config_file()
         config = ConfigReader(file_path)
