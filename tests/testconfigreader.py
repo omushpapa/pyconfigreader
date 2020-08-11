@@ -5,10 +5,10 @@ import codecs
 import json
 import os
 import sys
+import unittest
 from collections import OrderedDict
 from io import StringIO
 
-import unittest2 as unittest
 from faker import Faker
 from faker.providers import BaseProvider
 from testfixtures import TempDirectory, compare
