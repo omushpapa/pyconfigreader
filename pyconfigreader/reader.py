@@ -248,12 +248,13 @@ class ConfigReader(object):
 
     @staticmethod
     def _evaluate(value):
+        value_ = str(value)
         try:
-            result = ast.literal_eval(value)
+            result = ast.literal_eval(value_)
         except (ValueError, SyntaxError):
             # ValueError when normal string
             # SyntaxError when empty
-            result = os.path.expandvars(str(value))
+            result = os.path.expandvars(str(value_))
 
         return result
 
@@ -316,7 +317,7 @@ class ConfigReader(object):
                 raise MissingOptionError(key, section)
 
             value = default
-            self.set(key, default, section, commit=default_commit)
+            self.set(key, value, section, commit=default_commit)
 
         if evaluate:
             value = self._evaluate(value)

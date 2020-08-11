@@ -896,6 +896,29 @@ class TestConfigReaderTestCase(unittest.TestCase):
         with ConfigReader(file_path) as d, self.subTest():
             self.assertEqual(d.get('people', section='demo'), 'true')
 
+    def test_returns_false_if_option_with_default_not_evaluated(self):
+        config = self._get_config()
+
+        with self.subTest(0):
+            res = config.get('count', 'test', default=2)
+            compare(res, 2)
+
+        with self.subTest(1):
+            compare(config.get('counter', 'test', default='20'), 20)
+
+        config.close()
+
+    def test_returns_false_if_option_with_string_default_not_evaluated(self):
+        config = self._get_config()
+
+        with self.subTest(0):
+            compare(config.get('count', 'test', default='3'), 3)
+
+        with self.subTest(1):
+            compare(config.get('counter', 'test', default='20'), 20)
+
+        config.close()
+
 
 if __name__ == "__main__":
     unittest.main()
