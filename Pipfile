@@ -1,27 +1,16 @@
 [[source]]
-url = "https://pypi.python.org/simple"
-verify_ssl = true
 name = "pypi"
-
-[packages]
-testfixtures = "==5.4.0"
-"unittest2" = "==1.1.0"
-pypandoc = "==1.4"
-coverage = "*"
-tox = "*"
-codacy-coverage = "*"
-faker = "*"
+url = "https://pypi.org/simple"
+verify_ssl = true
 
 [dev-packages]
-watchdog = "*"
-u-msgpack-python = "*"
-sphinx-rtd-theme = "*"
-sphinx = "*"
-bumpversion = "*"
-twine = "*"
-line-profiler = "*"
 faker = "*"
-pympler = "*"
+testfixtures = "*"
+tox = "*"
+coverage = "*"
+codacy-coverage = "*"
+
+[packages]
 
 [requires]
 python_version = "3.6"
