@@ -16,7 +16,7 @@ setup(name='pyconfigreader',
       packages=['pyconfigreader'],
       install_requires=[],
       zip_safe=False,
-      python_requires='>3.4, <3.9',
+      python_requires='>3.4, <3.10',
       classifiers=[
           "Programming Language :: Python",
           "Programming Language :: Python :: 3",
@@ -24,5 +24,6 @@ setup(name='pyconfigreader',
           "Programming Language :: Python :: 3.6",
           "Programming Language :: Python :: 3.7",
           "Programming Language :: Python :: 3.8",
+          "Programming Language :: Python :: 3.9",
       ]
 )
