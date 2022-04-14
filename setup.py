@@ -7,7 +7,7 @@ except (ImportError, OSError, RuntimeError):
     long_description = 'Usage available at http://github.com/giantas/pyconfigreader'
 
 setup(name='pyconfigreader',
-      version='0.9.0',
+      version='0.10.0',
       description='A module for handling simple configuration requirements',
       long_description=long_description,
       url='http://github.com/giantas/pyconfigreader',
